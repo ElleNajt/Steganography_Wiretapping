@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 320" font-family="CMU Serif, Computer Modern, Georgia, serif" font-size="14">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#333" stroke-width="1.2"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#4a86c8" stroke-width="1.2"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#c44" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="700" height="320" fill="white" rx="4"/>
+
+  <!-- S input -->
+  <text x="30" y="112" font-size="16" font-style="italic" fill="#333">S</text>
+
+  <!-- X input -->
+  <text x="30" y="172" font-size="16" font-style="italic" fill="#333">X</text>
+  <text x="22" y="190" font-size="11" fill="#999">∈ {0,1}</text>
+
+  <!-- Arrows S,X → Encoder -->
+  <line x1="50" y1="108" x2="105" y2="130" stroke="#333" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="50" y1="168" x2="105" y2="148" stroke="#333" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+  <!-- Encoder box -->
+  <rect x="110" y="118" width="100" height="42" rx="5" fill="#e8f0fe" stroke="#4a86c8" stroke-width="1.5"/>
+  <text x="160" y="144" text-anchor="middle" font-size="13" fill="#333">encode<tspan font-size="10" dy="3" fill="#4a86c8">A</tspan></text>
+
+  <!-- Arrow Encoder → T -->
+  <line x1="210" y1="139" x2="308" y2="139" stroke="#333" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <text x="256" y="132" font-size="15" font-style="italic" fill="#333">T</text>
+
+  <!-- Judge: branch up from T line -->
+  <line x1="240" y1="139" x2="240" y2="68" stroke="#999" stroke-width="1" stroke-dasharray="4,3"/>
+  <rect x="210" y="38" width="60" height="30" rx="4" fill="#fef3e0" stroke="#d4a843" stroke-width="1.2"/>
+  <text x="240" y="57" text-anchor="middle" font-size="12" fill="#333">judge</text>
+
+  <!-- Fork point -->
+  <circle cx="318" cy="139" r="3" fill="#333"/>
+
+  <!-- Main channel: T → decode_A -->
+  <line x1="318" y1="139" x2="428" y2="139" stroke="#4a86c8" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <text x="373" y="130" font-size="11" fill="#4a86c8">main</text>
+
+  <!-- Wiretap channel: T → decode_E -->
+  <line x1="318" y1="139" x2="428" y2="242" stroke="#c44" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="348" y="210" font-size="11" fill="#c44">wiretap</text>
+
+  <!-- Same-model decoder box -->
+  <rect x="433" y="118" width="100" height="42" rx="5" fill="#e8f0fe" stroke="#4a86c8" stroke-width="1.5"/>
+  <text x="483" y="144" text-anchor="middle" font-size="13" fill="#333">decode<tspan font-size="10" dy="3" fill="#4a86c8">A</tspan></text>
+
+  <!-- Eavesdropper decoder box -->
+  <rect x="433" y="222" width="100" height="42" rx="5" fill="#fde8e8" stroke="#c44" stroke-width="1.5"/>
+  <text x="483" y="247" text-anchor="middle" font-size="13" fill="#333">decode<tspan font-size="10" dy="3" fill="#c44">E</tspan></text>
+
+  <!-- Arrow decode_A → G_A -->
+  <line x1="533" y1="139" x2="590" y2="139" stroke="#4a86c8" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <text x="608" y="136" font-size="16" font-style="italic" fill="#333">G</text>
+  <text x="622" y="144" font-size="10" font-style="italic" fill="#4a86c8">A</text>
+
+  <!-- Arrow decode_E → G_E -->
+  <line x1="533" y1="243" x2="590" y2="243" stroke="#c44" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="608" y="240" font-size="16" font-style="italic" fill="#333">G</text>
+  <text x="622" y="248" font-size="10" font-style="italic" fill="#c44">E</text>
+
+  <!-- Delta formula -->
+  <text x="350" y="302" text-anchor="middle" font-size="13" fill="#555">Δ = max( I(X ; G<tspan font-size="9" dy="3" fill="#4a86c8">A</tspan><tspan dy="-3">) − I(X ; G</tspan><tspan font-size="9" dy="3" fill="#c44">E</tspan><tspan dy="-3">),  0 )</tspan></text>
+</svg>

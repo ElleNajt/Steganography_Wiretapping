@@ -14,7 +14,7 @@ logs/
 .envrc
 models
 
-data/
+results/
 value_head_probes/
 
 *.egg-info/
