@@ -15,7 +15,7 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
 # === Anthropic batch helpers ===
 
-def submit_batch(client, requests, chunk_size=200):
+def submit_batch(client, requests, chunk_size=10000):
     """Submit requests in chunks, return list of batch IDs."""
     batch_ids = []
     for start in range(0, len(requests), chunk_size):
@@ -64,7 +64,7 @@ def collect_batch(client, batch_ids):
     return results
 
 
-def run_batch(client, requests, chunk_size=200):
+def run_batch(client, requests, chunk_size=10000):
     """Submit, poll, collect. Returns {custom_id: text}."""
     batch_ids = submit_batch(client, requests, chunk_size)
     poll_batch(client, batch_ids)

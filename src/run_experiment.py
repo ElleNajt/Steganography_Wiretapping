@@ -43,13 +43,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 try:
     from src.prompts import (
         ENCODER_PROMPTS, DECODER_PROMPTS, JUDGE_PROMPTS,
-        OPENROUTER_SYSTEM_PROMPT,
+        OPENROUTER_SYSTEM_PROMPTS,
     )
     from src.clients import run_batch, anthropic_direct, openrouter_call
 except ImportError:
     from prompts import (
         ENCODER_PROMPTS, DECODER_PROMPTS, JUDGE_PROMPTS,
-        OPENROUTER_SYSTEM_PROMPT,
+        OPENROUTER_SYSTEM_PROMPTS,
     )
     from clients import run_batch, anthropic_direct, openrouter_call
 
@@ -144,8 +144,12 @@ def load_or_init(path, config):
 
 
 def save(path, data):
+    import fcntl
     with open(path, "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
         json.dump(data, f, indent=2)
+        f.flush()
+        fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def strip_fences(text):
@@ -193,6 +197,25 @@ def parse_letter(response):
         line = line.strip()
         if len(line) == 1 and line.isalpha():
             return line.upper()
+    return None
+
+
+def parse_digit(response):
+    """Extract digit from <digit>X</digit>. Returns str '0'-'9' or None."""
+    if not response:
+        return None
+    m = re.search(r"<digit>([0-9])</digit>", response)
+    if m:
+        return m.group(1)
+    # Fallback: bare single digit
+    stripped = response.strip()
+    if len(stripped) == 1 and stripped.isdigit():
+        return stripped
+    # Fallback: last line that's a single digit
+    for line in reversed(stripped.split("\n")):
+        line = line.strip()
+        if len(line) == 1 and line.isdigit():
+            return line
     return None
 
 
@@ -486,10 +509,12 @@ def phase_judge(client, judge_prompt_template, data, path, fast=False):
 
 def phase_decode(client, http_client, decoder_label, decoder_cfg,
                  decoder_prompt_template, data, path, fast=False,
-                 response_parser=None):
+                 response_parser=None, openrouter_system_prompt=None):
     """Decode with any model. Appends to trial['decoders'][decoder_label]."""
     if response_parser is None:
         response_parser = parse_bit
+    if openrouter_system_prompt is None:
+        openrouter_system_prompt = OPENROUTER_SYSTEM_PROMPTS["bit"]
     model_id = decoder_cfg["model_id"]
     backend = decoder_cfg["backend"]
     thinking_budget = decoder_cfg["thinking_budget"]
@@ -561,7 +586,7 @@ def phase_decode(client, http_client, decoder_label, decoder_cfg,
             prompt = decoder_prompt_template.format(sentence=t["encoded"])
             return i, openrouter_call(
                 http_client, model_id, prompt,
-                system_prompt=OPENROUTER_SYSTEM_PROMPT, max_tokens=8000,
+                system_prompt=openrouter_system_prompt, max_tokens=8000,
                 reasoning=reasoning
             )
         done = 0
@@ -629,18 +654,26 @@ def main():
 
     # Resolve prompts
     alphabet_mode = args.encoder_prompt == "alphabet"
+    digit_mode = args.encoder_prompt == "digit"
     word_mode = args.encoder_prompt == "word"
     domain = detect_domain(args.seeds)
     encoder_prompt = ENCODER_PROMPTS[args.encoder_prompt]
     if word_mode:
         decoder_prompt = DECODER_PROMPTS["word"]
         response_parser = parse_word
+        or_system_prompt = OPENROUTER_SYSTEM_PROMPTS["word"]
+    elif digit_mode:
+        decoder_prompt = DECODER_PROMPTS["digit"]
+        response_parser = parse_digit
+        or_system_prompt = OPENROUTER_SYSTEM_PROMPTS["digit"]
     elif alphabet_mode:
         decoder_prompt = DECODER_PROMPTS["alphabet"]
         response_parser = parse_letter
+        or_system_prompt = OPENROUTER_SYSTEM_PROMPTS["letter"]
     else:
         decoder_prompt = DECODER_PROMPTS[domain]
         response_parser = parse_bit
+        or_system_prompt = OPENROUTER_SYSTEM_PROMPTS["bit"]
     judge_prompt = JUDGE_PROMPTS[domain]
 
     # Load seeds
@@ -650,6 +683,8 @@ def main():
         bits = [random.choice(COMMON_WORDS) for _ in range(args.n)]
         print(f"Word mode: sampling from {len(COMMON_WORDS)} words "
               f"(~{len(COMMON_WORDS):.0f} symbols = {__import__('math').log2(len(COMMON_WORDS)):.1f} bits)")
+    elif digit_mode:
+        bits = [str(random.randint(0, 9)) for _ in range(args.n)]
     elif alphabet_mode:
         import string
         bits = [random.choice(string.ascii_uppercase) for _ in range(args.n)]
@@ -701,14 +736,16 @@ def main():
         # Same-model decode
         phase_decode(client, http_client, model_label, model_cfg,
                      decoder_prompt, data, path, fast=args.fast,
-                     response_parser=response_parser)
+                     response_parser=response_parser,
+                     openrouter_system_prompt=or_system_prompt)
 
         # Eavesdropper decodes
         for eaves_label in eavesdropper_labels:
             eaves_cfg = MODELS[eaves_label]
             phase_decode(client, http_client, eaves_label, eaves_cfg,
                          decoder_prompt, data, path, fast=args.fast,
-                         response_parser=response_parser)
+                         response_parser=response_parser,
+                         openrouter_system_prompt=or_system_prompt)
 
         summarize(data, model_label)
 
