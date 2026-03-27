@@ -7,11 +7,11 @@
 
 * tldr:
 
-The primary contribution of this post is showing that frontier models can agree on Schelling steganography schemes, given just the knowledge of the alphabet they are to be using, and they can do so in a way that has a significant security advantage against weaker eavesdroppers. 
+The primary contribution of this post is showing that frontier models can agree on Schelling steganography schemes, given just the knowledge of the alphabet they are to be using, and they can do so in a way that has a significant advantage against weaker eavesdroppers, and sometimes against strong eavesdroppers from other model families.
 
 * Intro 
 
-In this post we study a coding theory game that measures if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes knowing only the alphabet.
+In this post we study a  game that measures if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes knowing only the alphabet.
 
 This game uses the concept of the secrecy capacity of a wire-tapping channel to model whether a steganographic message is obvious; the encoder model hides one of 26 letters (A-Z) in a sentence, and we measure the mutual information that its decoder copy recovers minus the mutual information that an eavesdropping model recovers. This difference yields a lower bound on the secrecy capacity of the wiretap channel, which is the rate at which one could use the gap in decodability between same-model decodability and eavesdropper-decodability to encode
 
@@ -80,7 +80,6 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import seaborn as sns
 from src.analysis import *
 from src.stego_db import get_db
 
@@ -88,51 +87,53 @@ PROMPT_TYPE = "alphabet"
 SEED_SET = "wikipedia"
 db = get_db()
 encoder_labels = get_encoder_models(db, PROMPT_TYPE, SEED_SET)
-decoder_labels = ["Self"] + EAVESDROPPERS
-acc_matrix = np.full((len(encoder_labels), len(decoder_labels)), np.nan)
-count_matrix = [['' for _ in decoder_labels] for _ in encoder_labels]
+decoder_labels_bar = ["Self"] + EAVESDROPPERS
+colors_bar = {d: EAVES_COLORS.get(d, '#333333') for d in EAVESDROPPERS}
+colors_bar["Self"] = '#333333'
 
-for i, enc_label in enumerate(encoder_labels):
-    for j, dec_label in enumerate(decoder_labels):
+x = np.arange(len(encoder_labels))
+width = 0.12
+
+fig, ax = plt.subplots(figsize=(12, 5))
+for j, dec_label in enumerate(decoder_labels_bar):
+    accs, cis = [], []
+    for enc_label in encoder_labels:
         dl = enc_label if dec_label == "Self" else dec_label
         acc, n = acc_and_n(db, enc_label, dl, PROMPT_TYPE, SEED_SET)
         if acc is not None:
-            acc_matrix[i, j] = acc
-            count_matrix[i][j] = f"{int(acc*n/100)}/{n}"
+            accs.append(acc)
+            cis.append(ci95(acc, n))
+        else:
+            accs.append(0)
+            cis.append(0)
+    offset = (j - (len(decoder_labels_bar)-1)/2) * width
+    ax.bar(x + offset, accs, width, yerr=cis, capsize=2,
+           color=colors_bar[dec_label], label=dec_label, alpha=0.85)
 
-fig, ax = plt.subplots(figsize=(9, 5))
-sns.heatmap(acc_matrix, annot=True, fmt='.0f', cmap='RdYlGn',
-            center=100*CHANCE, vmin=0, vmax=80, ax=ax,
-            xticklabels=decoder_labels, yticklabels=encoder_labels,
-            cbar_kws={'label': 'Decode accuracy (%)'})
-for i in range(len(encoder_labels)):
-    for j in range(len(decoder_labels)):
-        if count_matrix[i][j]:
-            ax.text(j + 0.5, i + 0.72, count_matrix[i][j],
-                    ha='center', va='center', fontsize=6, color='gray')
-ax.set_xlabel('Decoder')
-ax.set_ylabel('Encoder')
-ax.set_title('Encoder × decoder accuracy (alphabet mode, 26 letters, chance = {:.1f}%)'.format(100*CHANCE))
+ax.axhline(y=100*CHANCE, color='gray', linestyle='--', alpha=0.5, label=f'Chance ({100*CHANCE:.1f}%)')
+ax.set_ylabel('Decode accuracy (%)')
+ax.set_title('Encoder × decoder accuracy (alphabet, 26 symbols, chance = {:.1f}%)'.format(100*CHANCE))
+ax.set_xticks(x)
+ax.set_xticklabels(encoder_labels)
+ax.legend(fontsize=7, title='Decoder', ncol=2)
 plt.tight_layout()
 plt.show()
 #+end_src
 
 #+RESULTS:
 :results:
-
-
-[[file:plots/SchellingSteganography/plot_20260327_130256_7092447.png]]
-Cell Timer: 0:02:03
+[[file:plots/SchellingSteganography/plot_20260327_134708_9314622.png]]
+Cell Timer: 0:02:36
 :end:
 
 * Related work
 
-Steganography has been studied from a few angles in the safety community. 
+Steganography has been studied from a few angles in the safety community:
 
 - One noteable example is this [[https://www.lesswrong.com/posts/9Fdd9N7Escg3tcymb/preventing-language-models-from-hiding-their-reasoning
 ][post]] (Roger, Greenblatt 2023), which studied paraphrasing as a defense against steganography.
 
-- A recent example is Anwar et al. (2026), which introdocues a steganographic gap via utility advantage over the eavesdropper. Our framework is similar in spirit, and you can recover accuracy gap as a special case of their framework, by taking the utility to be guessing the correct alphabet character. I don't think you can recover the secrecy gap directly in their framework. I like using MI because of the direction connection to secrecy against eavesdroppers, though MI is quadratically harder to measure as the alphabet size grows.
+- A recent example is Anwar et al. (2026), which introdocues a steganographic gap via utility advantage over the eavesdropper. Our framework is a special case (though developed indepednetly): you can recover accuracy gap as a special case of their framework, by taking the utility to be guessing the correct alphabet character. I don't think you can recover the secrecy gap directly in their framework. MI has the advantage of the direction connection to secrecy against eavesdroppers, though MI is quadratically harder to measure as the alphabet size grows.
 
 The primary contribution of this post is showing that frontier models can agree on Schelling steganography schemes, given just the knowledge of the alphabet they are to be using, and they can do so in a way that has a significant security advantage against weaker eavesdroppers. 
 
@@ -321,6 +322,8 @@ Cell Timer: 0:02:02
 #+begin_src python
 import numpy as np
 import pandas as pd
+import importlib, src.analysis
+importlib.reload(src.analysis)
 from src.analysis import *
 from src.stego_db import get_db
 
@@ -346,26 +349,72 @@ for label in encoder_labels:
         if not len(syms):
             row[f"p vs {eaves}"] = "\u2014"
             continue
-        obs, p = paired_bootstrap_pvalue(syms, gs_self, syms, gs_eaves)
+        obs, p = paired_permutation_pvalue(syms, gs_self, gs_eaves)
         row[f"p vs {eaves}"] = f"{p:.4f}"
     rows.append(row)
 
-print("*Secrecy p-values (paired bootstrap, 10k resamples). p < 0.05 = significant secrecy.*\n")
+print("*Secrecy p-values (permutation test, 10k permutations). p < 0.05 rejects H0: MI(self) \\leq MI(eaves).*\n")
 print(pd.DataFrame(rows))
 #+end_src
 
 #+RESULTS:
 :results:
-*Secrecy p-values (paired bootstrap, 10k resamples). p < 0.05 = significant secrecy.*
-| idx | Encoder  | Self-decode     | I(X;G_self) | p vs Opus 4.6 | p vs Haiku | p vs Gemini Flash | p vs Gemini 3.1 Pro | p vs GPT-5.4 |
-|-----+----------+-----------------+-------------+---------------+------------+-------------------+---------------------+--------------|
-|   0 | Opus 4.5 | 1861/4360 (43%) |        1.23 |        1.0000 |     0.0000 |            0.0000 | —                   | —            |
-|   1 | Opus 4.6 | 2777/4422 (63%) |        2.20 |             — |     0.0000 |            0.0000 | —                   | —            |
-|   2 | Sonnet 4 | 661/4178 (16%)  |        0.30 |        1.0000 |     0.0000 |            0.0000 | —                   | —            |
-Cell Timer: 0:01:14
+*Secrecy p-values (permutation test, 10k permutations). p < 0.05 rejects H0: MI(self) \leq MI(eaves).*
+| idx | Encoder        | Self-decode     | I(X;G_self) | p vs Opus 4.6 | p vs Sonnet 4 | p vs Haiku | p vs Gemini Flash | p vs Gemini 3.1 Pro | p vs GPT-5.4 |
+|-----+----------------+-----------------+-------------+---------------+---------------+------------+-------------------+---------------------+--------------|
+|   0 | Gemini 3.1 Pro | 876/1460 (60%)  |        2.29 |        0.0000 |        0.0000 |     0.0000 |            0.0000 | —                   | —            |
+|   1 | Opus 4.5       | 1861/4360 (43%) |        1.23 |        1.0000 |        0.0000 |     0.0000 |            0.0000 | —                   | —            |
+|   2 | Opus 4.6       | 2777/4422 (63%) |        2.20 |             — |        0.0000 |     0.0000 |            0.0000 | —                   | —            |
+|   3 | Sonnet 4       | 661/4178 (16%)  |        0.30 |        1.0000 |             — |     0.0000 |            0.0000 | —                   | —            |
+Cell Timer: 0:02:16
 :end:
 
 ** Encoder x decoder accuracy
+
+#+begin_src python
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from src.analysis import *
+from src.stego_db import get_db
+
+PROMPT_TYPE = "alphabet"
+SEED_SET = "wikipedia"
+db = get_db()
+encoder_labels = get_encoder_models(db, PROMPT_TYPE, SEED_SET)
+decoder_labels_bar = ["Self"] + EAVESDROPPERS
+colors_bar = {d: EAVES_COLORS.get(d, '#333333') for d in EAVESDROPPERS}
+colors_bar["Self"] = '#333333'
+
+x = np.arange(len(encoder_labels))
+width = 0.12
+
+fig, ax = plt.subplots(figsize=(12, 5))
+for j, dec_label in enumerate(decoder_labels_bar):
+    accs, cis = [], []
+    for enc_label in encoder_labels:
+        dl = enc_label if dec_label == "Self" else dec_label
+        acc, n = acc_and_n(db, enc_label, dl, PROMPT_TYPE, SEED_SET)
+        if acc is not None:
+            accs.append(acc)
+            cis.append(ci95(acc, n))
+        else:
+            accs.append(0)
+            cis.append(0)
+    offset = (j - (len(decoder_labels_bar)-1)/2) * width
+    ax.bar(x + offset, accs, width, yerr=cis, capsize=2,
+           color=colors_bar[dec_label], label=dec_label, alpha=0.85)
+
+ax.axhline(y=100*CHANCE, color='gray', linestyle='--', alpha=0.5, label=f'Chance ({100*CHANCE:.1f}%)')
+ax.set_ylabel('Decode accuracy (%)')
+ax.set_title('Encoder × decoder accuracy (alphabet, 26 symbols)')
+ax.set_xticks(x)
+ax.set_xticklabels(encoder_labels)
+ax.legend(fontsize=7, title='Decoder', ncol=2)
+plt.tight_layout()
+plt.show()
+#+end_src
 
 #+begin_src python
 import numpy as np
@@ -411,8 +460,9 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260327_130502_6625785.png]]
-Cell Timer: 0:02:05
+
+[[file:plots/SchellingSteganography/plot_20260327_133836_7103320.png]]
+Cell Timer: 0:02:10
 :end:
 
 ** Accuracy gaps
