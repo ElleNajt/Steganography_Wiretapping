@@ -517,7 +517,7 @@ Cell Timer: 0:03:59
 
 * Alphabets
 
-The alphabet has a pretty significant effect on the secrecy capacity of channels.
+The alphabet has a significant effect on the secrecy capacity of channels.
 
 ** Binary alphabet
 
@@ -742,7 +742,7 @@ Cell Timer: 0:02:01
 
 Using a "common English word" could yield much higher channel capacity, but the secrecy capacity tanks because the encoder model chooses an obvious encoding such that weaker model is trivially able to break the code.
 
-There is also the problem that you would need an *astronomical* number of samples to estimate the mutual information (see Note on MI estimation).
+There is also the problem that you would need an *astronomical* number of samples to estimate the mutual information (see Note on MI estimation); for this reason we do not even both to try to estimate the secrecy capacity.
 
 #+begin_src python
 import numpy as np
@@ -794,59 +794,6 @@ plt.show()
 Cell Timer: 0:00:48
 :end:
 
-#+begin_src python
-import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from src.analysis import *
-from src.stego_db import get_db
-
-PROMPT_TYPE = "word"
-SEED_SET = "wikipedia"
-
-db = get_db()
-encoder_labels = get_encoder_models(db, PROMPT_TYPE, SEED_SET)
-x = np.arange(len(encoder_labels))
-width = 0.15
-
-encoder_ns = []
-for label in encoder_labels:
-    _, n = acc_and_n(db, label, label, PROMPT_TYPE, SEED_SET)
-    encoder_ns.append(n)
-xlabels = [f"{label}\n(n={n})" for label, n in zip(encoder_labels, encoder_ns)]
-
-fig, ax = plt.subplots(figsize=(10, 5))
-for j, eaves in enumerate(EAVESDROPPERS):
-    vals = []
-    for label in encoder_labels:
-        if eaves == label:
-            vals.append(0)
-            continue
-        syms, gs, ge = extract_paired(db, label, label, eaves, PROMPT_TYPE, SEED_SET)
-        if len(syms) == 0:
-            vals.append(0)
-            continue
-        vals.append(mi(syms, gs) - mi(syms, ge))
-    ax.bar(x + (j - (len(EAVESDROPPERS)-1)/2) * width, vals, width, color=EAVES_COLORS[eaves],
-           label=f"Eavesdropper: {eaves}")
-
-ax.axhline(y=0, color='gray', linestyle='--', alpha=0.5, label='Zero (no secrecy)')
-ax.set_ylabel('I(X;G_self) − I(X;G_eaves) (bits)')
-ax.set_title('Secrecy capacity by encoder model (common English words)')
-ax.set_xticks(x)
-ax.set_xticklabels(xlabels)
-ax.legend(fontsize=8, title='Eavesdropper')
-plt.tight_layout()
-plt.show()
-#+end_src
-
-#+RESULTS:
-:results:
-
-[[file:plots/SchellingSteganography/plot_20260327_192623_3773907.png]]
-Cell Timer: 0:00:39
-:end:
 
 * What are the models doing?
 
