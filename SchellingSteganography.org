@@ -11,9 +11,11 @@ Frontier models can agree on Schelling steganography schemes, given just the kno
 
 * Intro 
 
-In this post we study a game that measures if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes knowing only the alphabet. This can be viewed as a special case of the decision theoretic framework from [cite:@anwar2026decision].
+In this post we study a game that measures if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes knowing only the alphabet. 
 
-An encoder model is told it is playing a Schelling point game with another copy of itself: it must hide one of 26 letters (A-Z) in a sentence using only stylistic changes, so that a second copy of the model can decode the letter from the modified text alone, while an eavesdropper (a different LLM) cannot. The decoder is told only the task (recover the hidden letter) — neither encoder nor decoder are given any prior arrangement on the encoding scheme beyond the alphabet. We measure how accurately the encoder's own model family decodes the hidden letter compared to eavesdropping models from other families or from weaker models. We further formalize this gap using the wiretap channel framework [cite:@csiszar1978]: the difference in mutual information between the self-decoder and eavesdropper channels lower bounds the secrecy capacity.
+An encoder model is told it is playing a Schelling point game with another copy of itself: it must hide one of 26 letters (A-Z) in a sentence using only stylistic changes, so that a second copy of the model can decode the letter from the modified text alone, while an eavesdropper (a different LLM) cannot. The decoder is told only the task (recover the hidden letter) — neither encoder nor decoder are given any prior arrangement on the encoding scheme beyond the alphabet. We measure how accurately the encoder's own model family decodes the hidden letter compared to eavesdropping models from other families or from weaker models.
+
+We formalize this gap using the wiretap channel framework [cite:@csiszar1978]: the difference in mutual information between the self-decoder and eavesdropper channels lower bounds the secrecy capacity. Since mutual information is notoriously hard to reliably estimate, we report accuracy gaps, in which case this can be viewed as a special case of the decision theoretic framework from [cite:@anwar2026decision].
 
 Key results:
 @TODO Update after results come back.
@@ -517,7 +519,15 @@ print(pd.DataFrame(rows))
 
 #+RESULTS:
 :results:
-1be5f339-94cc-4987-9b62-300da30e6af9
+*Secrecy p-values (permutation test, 10k permutations). p < 0.05 rejects H0: MI(self) \leq MI(eaves).*
+| idx | Encoder        | Self-decode     | I(X;G_self) | p vs Opus 4.6 | p vs Sonnet 4 | p vs Haiku | p vs Gemini Flash | p vs Gemini 3.1 Pro | p vs GPT-5.4 |
+|-----+----------------+-----------------+-------------+---------------+---------------+------------+-------------------+---------------------+--------------|
+|   0 | GPT-5.4        | 204/4958 (4%)   |        0.10 |        0.5783 |        0.9096 |     0.3556 |                 — |                   — | —            |
+|   1 | Gemini 3.1 Pro | 1387/2344 (59%) |        2.12 |        0.0000 |        0.0000 |     0.0000 |            0.0000 |                   — | —            |
+|   2 | Opus 4.5       | 1861/4360 (43%) |        1.23 |        1.0000 |        0.0000 |     0.0000 |            0.0000 |              1.0000 | —            |
+|   3 | Opus 4.6       | 2777/4422 (63%) |        2.20 |             — |        0.0000 |     0.0000 |            0.0000 |              1.0000 | —            |
+|   4 | Sonnet 4       | 661/4178 (16%)  |        0.30 |        1.0000 |             — |     0.0000 |            0.0000 |              1.0000 | —            |
+Cell Timer: 0:04:17
 :end:
 
 * Varying the Alphabet
