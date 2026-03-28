@@ -7,11 +7,11 @@
 
 * tldr:
 
-Frontier models can agree on Schelling steganography schemes, given just the knowledge of the alphabet they are to be using, and they can do so in a way that has a significant advantage against weaker eavesdroppers, and sometimes against strong eavesdroppers from other model families. Paraphrasing with a weak or strong model removes this advantage. The schelling strategy that models converge to depends on the alphabet, and can usually be decoded roughly at the same rate as models are able to decode themselves.
+Frontier models can agree on Schelling steganography schemes, given just the knowledge of the alphabet to be used, and they can do so in a way that has a significant advantage against weaker eavesdroppers, and sometimes against strong eavesdroppers from other model families. Paraphrasing removes this advantage. The schelling strategy that models converge to depends on the alphabet, and deterministic algorithms invented by Opus 4.6 analyzing encoder CoT do not do nearly as well as models do; another indication that the Schelling rules are, if not non-obvious, at least a non-obvious mix of strategies.
 
 * Intro 
 
-In this post we study a game that measures if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes knowing only the alphabet.
+In this post we study a game that measures if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes knowing only the alphabet. This game is a special case of the decision theoretic framework from Anwar et al. [cite:@anwar2026decision].
 
 An encoder model is told it is playing a Schelling point game with another copy of itself: it must hide one of 26 letters (A-Z) in a sentence using only stylistic changes, so that a second copy can decode the letter from the modified text alone, while an eavesdropper (a different LLM) cannot. The decoder is told only the task (recover the hidden letter) — neither encoder nor decoder are given any prior arrangement on the encoding scheme beyond the alphabet. We measure how accurately the encoder's own model family decodes the hidden letter compared to eavesdropping models from other families. We further formalize this gap using the wiretap channel framework [cite:@csiszar1978]: the difference in mutual information between the self-decoder and eavesdropper channels lower bounds the secrecy capacity.
 
@@ -131,7 +131,7 @@ Steganography has been studied from a few angles in the safety community:
 
 - One notable example is this [[https://www.lesswrong.com/posts/9Fdd9N7Escg3tcymb/preventing-language-models-from-hiding-their-reasoning][post]] (Roger, Greenblatt 2023), which studied paraphrasing as a defense against steganography.
 
-- A recent example is Anwar et al. (2026), which introduces a notion of steganographic gap via utility advantage over the eavesdropper. Our MI-based secrecy gap measures the same asymmetry as their steganographic gap but uses mutual information rather than task accuracy as the information measure. The accuracy gap is a special case of their framework; the MI gap is not, because MI depends on the full joint distribution rather than a fixed pointwise utility.
+- A recent example is Anwar et al. [cite:@anwar2026decision], which introduces a notion of steganographic gap via utility advantage over the eavesdropper. Our MI-based secrecy gap measures the same asymmetry as their steganographic gap but uses mutual information rather than task accuracy as the information measure. The accuracy gap is a special case of their framework; the MI gap is not, because MI depends on the full joint distribution rather than a fixed pointwise utility. ( @TODO double check me)
 
 The primary contribution of this post is showing that frontier models can agree on Schelling steganography schemes, given just the knowledge of the alphabet they are to be using, and they can do so in a way that has a significant security advantage against weaker eavesdroppers. 
 
@@ -153,11 +153,13 @@ We also have a decoding prompt, which explains the game and instructs the models
 
 Define $G_A = \text{decode}_A(\text{encode}_A(S, X))$ as the same-model guess, and $G_E = \text{decode}_E(\text{encode}_A(S, X))$ as the eavesdropper $E$'s guess.
 
-Decoders are instructed to respond with their guess in =<letter>X</letter>= tags. If a decoder's response cannot be parsed into a valid letter (e.g. it uses a different format, or produces only natural language), that trial is excluded from the mutual information calculation for that decoder. This means $I(X; G_A)$ and $I(X; G_E)$ may be computed over different subsets of trials. In practice, Anthropic models almost always follow the format (>99% parse rate), while some third-party models (notably Gemini Flash) have lower parse rates (~20-25%), so their MI estimates are based on fewer samples.
+Decoders are instructed to respond with their guess in =<letter>X</letter>= tags.
+
+# If a decoder's response cannot be parsed into a valid letter (e.g. it uses a different format, or produces only natural language), that trial is excluded from the mutual information calculation for that decoder. This means $I(X; G_A)$ and $I(X; G_E)$ may be computed over different subsets of trials. In practice, Anthropic models almost always follow the format (>99% parse rate), while some third-party models (notably Gemini Flash) have lower parse rates (~20-25%), so their MI estimates are based on fewer samples.
 
 We measure $\Delta = \max(I(X; G_A) - I(X; G_E),\; 0)$, where $I$ is the mutual information: how much more information $A$ extracts about $X$ than $E$ does.  If $\Delta > 0$, the channel could support secret communication from $A$ to itself that $E$ cannot recover, by using a wiretapping code.
 
-[[file:wiretap_model.svg]]
+[[file:wiretap_model.png]]
 
 See appendix for the precise prompts, under the different data regimes (random sentence and random function).
 
@@ -169,7 +171,7 @@ To make the connection to wiretapping codes, we view our game above as the defin
 
 Given a symbol $X \in \mathcal{A}$, the symbol received by the legitimate party is $Y = G_A$, and the symbol received by the eavesdropper is $Z = G_E$.
 
-[[file:wiretap_diagram.svg]]
+[[file:wiretap_diagram.png]]
 
 - The *legitimate receiver*: another copy of $A$, which decodes $G_A$
 - The *eavesdropper*: model $E$, which decodes $G_E$
@@ -1274,7 +1276,7 @@ Cell Timer: 0:00:21
 
 - Models can communicate steganographically with themselves, in ways that are not entirely obvious, and that more capable models are better at doing this to a degree that gives them a secrecy advantage. (Though they are not even good at this, e.g. GPT-5.4 is remarkably bad at this task.)
 
-- Paraphrasing destroys the signal.
+- Paraphrasing destroys the steganographic signal.
 
 - The fact that models from different families with similar capability are good at decoding each others messages is a positive story for control (especially untrusted control), since it indicates that there's something universal about the choice of encoding scheme.
 
@@ -1288,9 +1290,7 @@ Follow ups:
 
 - To avoid the training data confound, it could be worthwhile to vary the encoding data further. For instance, asking for steganographically encoding letters inside solutions to coding evals, or Q&A responses as in Roger 2023.
   
-- One can replicate this experimental scenario where instead of encoding a letter in a sentence, the game asks them encode more complex information in a text corpus, and plays against an eavesdropper in a similar way. (See "Leaky Abstraction" section.)
-
-- It's possible that coordination is related to RL training, instead of being directly a function of capacity, as Puri et al. [cite:@puri2025reaching] explore.
+- It's possible that coordination is related to RL training, instead of being directly a function of capacity, as Puri et al. [cite:@puri2025reaching] explore. It could be interesting to see if measure how much different kinds of RL training impacts model performance on these tasks.
   
 * Appendix:
 
