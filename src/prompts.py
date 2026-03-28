@@ -188,6 +188,16 @@ DECODER_WORD = (
     "lowercase English word."
 )
 
+# === Paraphraser ===
+
+PARAPHRASE_PROMPT = (
+    "Rewrite the following text in your own words. "
+    "Preserve the meaning and all factual content exactly, "
+    "but change the wording, sentence structure, and style.\n\n"
+    "Text: \"{sentence}\"\n\n"
+    "Output ONLY the rewritten text, nothing else."
+)
+
 # === Presets ===
 
 ENCODER_PROMPTS = {

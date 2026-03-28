@@ -1,19 +1,8 @@
 """Shared analysis helpers for org-mode src blocks."""
-import json, os, re
 import numpy as np
+from src.stego_db import get_db
 
-ALPHA_DIR = "results/stego_b22c67f_2026-03-25_wikipedia_alphabet"
-
-ENCODERS = {
-    "opus_4_6": "Opus 4.6",
-    "opus_4_5": "Opus 4.5",
-    "sonnet_4": "Sonnet 4",
-    "gemini_3_1_pro": "Gemini 3.1 Pro",
-    "gemini_flash": "Gemini Flash",
-    "gpt-5_4": "GPT-5.4",
-}
-
-EAVESDROPPERS = ["Opus 4.6", "Haiku", "Gemini Flash", "Gemini 3.1 Pro", "GPT-5.4"]
+EAVESDROPPERS = ["Opus 4.6", "Sonnet 4", "Haiku", "Gemini Flash", "Gemini 3.1 Pro", "GPT-5.4"]
 
 EAVES_COLORS = {
     'Opus 4.6': '#4878CF', 'Opus 4.5': '#7B68EE', 'Haiku': '#E24A33',
@@ -48,38 +37,49 @@ def mi(symbols, guesses):
     return np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_s * p_g)[mask]))
 
 
-def extract_decoder(data, decoder_label):
-    """Extract (symbols, guesses) arrays for a decoder."""
-    symbols, guesses = [], []
-    for t in data["trials"]:
-        if not t or not t.get("meaning_preserved"):
-            continue
-        dec_entries = t.get("decoders", {}).get(decoder_label, [])
-        if not dec_entries:
-            continue
-        g = dec_entries[0].get("bit")
-        if g is not None:
-            symbols.append(t["bit"])
-            guesses.append(g)
+def extract_decoder(db, encoder_model, decoder_model, prompt_type, seed_set):
+    """Extract (symbols, guesses) arrays for a decoder from SQLite."""
+    rows = db.execute(
+        """SELECT t.symbol, d.decoded_symbol FROM trials t
+           JOIN decodes d ON t.trial_idx = d.trial_idx
+               AND t.encoder_model = d.encoder_model
+               AND t.prompt_type = d.prompt_type
+               AND t.seed_set = d.seed_set
+           WHERE t.encoder_model = ? AND t.prompt_type = ? AND t.seed_set = ?
+               AND d.decoder_model = ?
+               AND t.meaning_preserved = 1
+               AND d.decoded_symbol IS NOT NULL""",
+        (encoder_model, prompt_type, seed_set, decoder_model),
+    ).fetchall()
+    if not rows:
+        return np.array([]), np.array([])
+    symbols, guesses = zip(*rows)
     return np.array(symbols), np.array(guesses)
 
 
-def extract_paired(data, self_label, eaves_label):
+def extract_paired(db, encoder_model, self_decoder, eaves_decoder, prompt_type, seed_set):
     """Extract paired (symbols, self_guesses, eaves_guesses) for trials where both decoded."""
-    symbols, gs, ge = [], [], []
-    for t in data["trials"]:
-        if not t or not t.get("meaning_preserved"):
-            continue
-        dec_s = t.get("decoders", {}).get(self_label, [])
-        dec_e = t.get("decoders", {}).get(eaves_label, [])
-        if not dec_s or not dec_e:
-            continue
-        g_s = dec_s[0].get("bit")
-        g_e = dec_e[0].get("bit")
-        if g_s is not None and g_e is not None:
-            symbols.append(t["bit"])
-            gs.append(g_s)
-            ge.append(g_e)
+    rows = db.execute(
+        """SELECT t.symbol, ds.decoded_symbol, de.decoded_symbol
+           FROM trials t
+           JOIN decodes ds ON t.trial_idx = ds.trial_idx
+               AND t.encoder_model = ds.encoder_model
+               AND t.prompt_type = ds.prompt_type
+               AND t.seed_set = ds.seed_set
+           JOIN decodes de ON t.trial_idx = de.trial_idx
+               AND t.encoder_model = de.encoder_model
+               AND t.prompt_type = de.prompt_type
+               AND t.seed_set = de.seed_set
+           WHERE t.encoder_model = ? AND t.prompt_type = ? AND t.seed_set = ?
+               AND ds.decoder_model = ? AND de.decoder_model = ?
+               AND t.meaning_preserved = 1
+               AND ds.decoded_symbol IS NOT NULL
+               AND de.decoded_symbol IS NOT NULL""",
+        (encoder_model, prompt_type, seed_set, self_decoder, eaves_decoder),
+    ).fetchall()
+    if not rows:
+        return np.array([]), np.array([]), np.array([])
+    symbols, gs, ge = zip(*rows)
     return np.array(symbols), np.array(gs), np.array(ge)
 
 
@@ -139,45 +139,65 @@ def bootstrap_delta(symbols, gs, ge, n_boot=10000):
     return observed, np.percentile(deltas, 2.5), np.percentile(deltas, 97.5)
 
 
-def paired_bootstrap_pvalue(symbols_s, guesses_s, symbols_e, guesses_e, n_boot=10000):
-    """Bootstrap p-value for H0: MI(self) <= MI(eaves)."""
-    n = min(len(symbols_s), len(symbols_e))
-    symbols_s = np.asarray(symbols_s[:n])
-    guesses_s = np.asarray(guesses_s[:n])
-    symbols_e = np.asarray(symbols_e[:n])
-    guesses_e = np.asarray(guesses_e[:n])
-    observed = mi(symbols_s, guesses_s) - mi(symbols_e, guesses_e)
-    all_vals = np.unique(np.concatenate([symbols_s, guesses_s, symbols_e, guesses_e]))
+def paired_permutation_pvalue(symbols, guesses_self, guesses_eaves, n_perm=10000):
+    """Permutation test for H0: MI(self) = MI(eaves) (decoder labels exchangeable).
+
+    For each trial independently, randomly swap which guess is 'self' vs 'eaves'.
+    Under H0, this is equally likely. The p-value is the fraction of permutations
+    where the permuted delta >= observed delta (one-sided: self > eaves).
+
+    This is exact under the null and avoids MI estimation bias issues, since
+    both MI estimates use the same n and the same data, just relabeled.
+    """
+    symbols = np.asarray(symbols)
+    guesses_self = np.asarray(guesses_self)
+    guesses_eaves = np.asarray(guesses_eaves)
+    n = len(symbols)
+    observed = mi(symbols, guesses_self) - mi(symbols, guesses_eaves)
+    all_vals = np.unique(np.concatenate([symbols, guesses_self, guesses_eaves]))
     val_map = {v: i for i, v in enumerate(all_vals)}
-    ssi = np.array([val_map[v] for v in symbols_s])
-    gsi = np.array([val_map[v] for v in guesses_s])
-    sei = np.array([val_map[v] for v in symbols_e])
-    gei = np.array([val_map[v] for v in guesses_e])
+    si = np.array([val_map[v] for v in symbols])
+    gsi = np.array([val_map[v] for v in guesses_self])
+    gei = np.array([val_map[v] for v in guesses_eaves])
     n_vals = len(all_vals)
     rng = np.random.default_rng(42)
-    indices = rng.choice(n, (n_boot, n), replace=True)
-    mi_self = _batch_mi(ssi, gsi, n_vals, n_vals, indices, n)
-    mi_eaves = _batch_mi(sei, gei, n_vals, n_vals, indices, n)
-    deltas = mi_self - mi_eaves
-    return observed, np.mean(deltas <= 0)
+    count_ge = 0
+    for _ in range(n_perm):
+        swap = rng.random(n) < 0.5
+        perm_self = np.where(swap, gei, gsi)
+        perm_eaves = np.where(swap, gsi, gei)
+        joint_s = np.zeros((n_vals, n_vals), dtype=np.int64)
+        joint_e = np.zeros((n_vals, n_vals), dtype=np.int64)
+        np.add.at(joint_s, (si, perm_self), 1)
+        np.add.at(joint_e, (si, perm_eaves), 1)
+        delta = _mi_from_counts(joint_s, n) - _mi_from_counts(joint_e, n)
+        if delta >= observed:
+            count_ge += 1
+    return observed, count_ge / n_perm
 
 
-def load_all(data_dir=None):
-    """Load all encoder result files. Returns {label: data}."""
-    if data_dir is None:
-        data_dir = ALPHA_DIR
-    all_data = {}
-    for fname, label in ENCODERS.items():
-        path = os.path.join(data_dir, f"{fname}.json")
-        if os.path.exists(path):
-            with open(path) as f:
-                all_data[label] = json.load(f)
-    return all_data
+def get_encoder_models(db, prompt_type, seed_set):
+    """Return list of encoder models that have data."""
+    rows = db.execute(
+        "SELECT DISTINCT encoder_model FROM trials WHERE prompt_type = ? AND seed_set = ?",
+        (prompt_type, seed_set),
+    ).fetchall()
+    return [r[0] for r in rows]
 
 
-def acc_and_n(data, decoder_label):
+def get_decoder_models(db, encoder_model, prompt_type, seed_set):
+    """Return list of decoder models that have decoded this encoder's trials."""
+    rows = db.execute(
+        """SELECT DISTINCT decoder_model FROM decodes
+           WHERE encoder_model = ? AND prompt_type = ? AND seed_set = ?""",
+        (encoder_model, prompt_type, seed_set),
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
+def acc_and_n(db, encoder_model, decoder_model, prompt_type, seed_set):
     """Return (accuracy_pct, n) for a decoder."""
-    symbols, guesses = extract_decoder(data, decoder_label)
+    symbols, guesses = extract_decoder(db, encoder_model, decoder_model, prompt_type, seed_set)
     if len(symbols) == 0:
         return None, 0
     correct = np.sum(symbols == guesses)
