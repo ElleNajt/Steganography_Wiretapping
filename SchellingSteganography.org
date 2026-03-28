@@ -129,8 +129,7 @@ Cell Timer: 0:03:46
 
 Steganography has been studied from a few angles in the safety community:
 
-- One notable example is this [[https://www.lesswrong.com/posts/9Fdd9N7Escg3tcymb/preventing-language-models-from-hiding-their-reasoning
-][post]] (Roger, Greenblatt 2023), which studied paraphrasing as a defense against steganography.
+- One notable example is this [[https://www.lesswrong.com/posts/9Fdd9N7Escg3tcymb/preventing-language-models-from-hiding-their-reasoning][post]] (Roger, Greenblatt 2023), which studied paraphrasing as a defense against steganography.
 
 - A recent example is Anwar et al. (2026), which introduces a notion of steganographic gap via utility advantage over the eavesdropper. Our MI-based secrecy gap measures the same asymmetry as their steganographic gap but uses mutual information rather than task accuracy as the information measure. The accuracy gap is a special case of their framework; the MI gap is not, because MI depends on the full joint distribution rather than a fixed pointwise utility.
 
@@ -1023,7 +1022,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-01d0f176-bac9-4ce3-8831-8d8f9ba37a06
+[[file:plots/SchellingSteganography/plot_20260327_192638_3697513.png]]
+Cell Timer: 0:00:06
 :end:
 
 ** Binary mode: no consistent strategy
@@ -1098,7 +1098,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-9e2824de-777e-485b-b008-df848c5df260
+[[file:plots/SchellingSteganography/plot_20260327_192645_9613245.png]]
+Cell Timer: 0:00:06
 :end:
 
 ** Word mode: acrostic
@@ -1218,7 +1219,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-27637780-9b99-4185-a3b2-a419dbd3d23f
+[[file:plots/SchellingSteganography/plot_20260327_192653_3579259.png]]
+Cell Timer: 0:00:08
 :end:
 
 This is why word mode has zero secrecy capacity — the encoding is completely transparent to any decoder, including a simple algorithm.
@@ -1297,7 +1299,28 @@ print(df)
 
 #+RESULTS:
 :results:
-a23c1a91-4d48-4cb0-85c1-7b751d735304
+| idx | Encoder        | Decoder  | Paraphraser | Direct    | Via paraphrase |  Δ acc |
+|-----+----------------+----------+-------------+-----------+----------------+--------|
+|   0 | GPT-5.4        | Opus 4.5 | Haiku       | 202/4958  | 21/493         |  +0.2% |
+|   1 | GPT-5.4        | Opus 4.6 | Haiku       | 202/4958  | 182/4953       |  -0.4% |
+|   2 | Gemini 3.1 Pro | Haiku    | Haiku       | 524/2794  | 124/2831       | -14.4% |
+|   3 | Gemini 3.1 Pro | Opus 4.6 | Haiku       | 1497/2796 | 117/2831       | -49.4% |
+|   4 | Opus 4.5       | Haiku    | Haiku       | 488/4351  | 186/4359       |  -6.9% |
+|   5 | Opus 4.5       | Opus 4.5 | Haiku       | 1861/4360 | 182/4355       | -38.5% |
+|   6 | Opus 4.5       | Opus 4.6 | Haiku       | 2338/4360 | 149/4360       | -50.2% |
+|   7 | Opus 4.5       | Sonnet 4 | Haiku       | 960/4360  | 176/4361       | -18.0% |
+|   8 | Opus 4.6       | Haiku    | Haiku       | 572/4420  | 188/4424       |  -8.7% |
+|   9 | Opus 4.6       | Haiku    | Opus 4.6    | 572/4420  | 189/4425       |  -8.7% |
+|  10 | Opus 4.6       | Opus 4.5 | Haiku       | 2400/4422 | 162/4423       | -50.6% |
+|  11 | Opus 4.6       | Opus 4.6 | Haiku       | 2777/4422 | 119/4425       | -60.1% |
+|  12 | Opus 4.6       | Opus 4.6 | Opus 4.6    | 2777/4422 | 129/4425       | -59.9% |
+|  13 | Opus 4.6       | Sonnet 4 | Haiku       | 1230/4422 | 185/4427       | -23.6% |
+|  14 | Opus 4.6       | Sonnet 4 | Opus 4.6    | 1230/4422 | 171/4427       | -24.0% |
+|  15 | Sonnet 4       | Haiku    | Haiku       | 420/4179  | 185/4174       |  -5.6% |
+|  16 | Sonnet 4       | Opus 4.5 | Haiku       | 971/4179  | 186/4175       | -18.8% |
+|  17 | Sonnet 4       | Opus 4.6 | Haiku       | 1061/4179 | 172/4176       | -21.3% |
+|  18 | Sonnet 4       | Sonnet 4 | Haiku       | 661/4178  | 197/4179       | -11.1% |
+Cell Timer: 0:00:21
 :end:
 
 * Conclusions
@@ -1476,7 +1499,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-208de32b-cdaf-46da-ac40-dde05d33ab1c
+[[file:plots/SchellingSteganography/plot_20260327_192716_6857138.png]]
+Cell Timer: 0:00:01
 :end:
 
 *** Secrecy capacity estimation? :noexport:
@@ -1566,7 +1590,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-e0db4c03-4318-4bdb-a57c-ddb90b9cea38
+[[file:plots/SchellingSteganography/plot_20260327_192818_8206174.png]]
+Cell Timer: 0:01:02
 :end:
 
 *** Bootstrap coverage for secrecy delta
@@ -1646,5 +1671,27 @@ print(df)
 
 #+RESULTS:
 :results:
-e9976337-e66f-44da-8a04-02686adbf62c
+| idx | Scenario                  | True Δ |    N | Coverage |
+|-----+---------------------------+--------+------+----------|
+|   0 | Self~chance, eaves~chance |   0.33 |  500 | 116/200  |
+|   1 | Self~chance, eaves~chance |   0.33 | 1000 | 181/200  |
+|   2 | Self~chance, eaves~chance |   0.33 | 2000 | 190/200  |
+|   3 | Self~chance, eaves~chance |   0.33 | 4400 | 192/200  |
+|   4 | Self=40%, eaves~chance    |   1.02 |  500 | 17/200   |
+|   5 | Self=40%, eaves~chance    |   1.02 | 1000 | 119/200  |
+|   6 | Self=40%, eaves~chance    |   1.02 | 2000 | 188/200  |
+|   7 | Self=40%, eaves~chance    |   1.02 | 4400 | 188/200  |
+|   8 | Self=65%, eaves~chance    |   2.20 |  500 | 0/200    |
+|   9 | Self=65%, eaves~chance    |   2.20 | 1000 | 11/200   |
+|  10 | Self=65%, eaves~chance    |   2.20 | 2000 | 173/200  |
+|  11 | Self=65%, eaves~chance    |   2.20 | 4400 | 186/200  |
+|  12 | Self=65%, eaves=30%       |   1.55 |  500 | 4/200    |
+|  13 | Self=65%, eaves=30%       |   1.55 | 1000 | 68/200   |
+|  14 | Self=65%, eaves=30%       |   1.55 | 2000 | 166/200  |
+|  15 | Self=65%, eaves=30%       |   1.55 | 4400 | 192/200  |
+|  16 | Self=65%, eaves=55%       |   0.51 |  500 | 145/200  |
+|  17 | Self=65%, eaves=55%       |   0.51 | 1000 | 168/200  |
+|  18 | Self=65%, eaves=55%       |   0.51 | 2000 | 187/200  |
+|  19 | Self=65%, eaves=55%       |   0.51 | 4400 | 187/200  |
+Cell Timer: 0:06:01
 :end:
