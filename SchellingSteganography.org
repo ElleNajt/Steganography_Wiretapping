@@ -7,17 +7,28 @@
 
 * tldr:
 
-Frontier models can agree on Schelling steganography schemes, given just the knowledge of the alphabet to be used, and they can do so in a way that has a significant advantage against weaker eavesdroppers, and sometimes against strong eavesdroppers from other model families. Paraphrasing removes this advantage. The schelling strategy that models converge to depends on the alphabet, and deterministic algorithms invented by Opus 4.6 analyzing encoder CoT do not do nearly as well as models do; another indication that the Schelling rules are, if not non-obvious, at least a non-obvious mix of strategies.
+Frontier models can agree on Schelling steganography schemes, given just the knowledge of the alphabet to be used, and they can do so in a way that has a significant advantage against weaker eavesdroppers, and sometimes against strong eavesdroppers from other model families. Paraphrasing removes this advantage. The Schelling strategy that models converge to depends on the alphabet; deterministic algorithms invented by Opus 4.6 analyzing encoder CoT do not do nearly as well as models do, another indication that the Schelling rules are, if not non-obvious, at least a non-obvious mix of strategies.
 
 * Intro 
 
-In this post we study a game that measures if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes knowing only the alphabet. This game is a special case of the decision theoretic framework from Anwar et al. [cite:@anwar2026decision].
+In this post we study a game that measures if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes knowing only the alphabet. This can be viewed as a special case of the decision theoretic framework from [cite:@anwar2026decision].
 
-An encoder model is told it is playing a Schelling point game with another copy of itself: it must hide one of 26 letters (A-Z) in a sentence using only stylistic changes, so that a second copy can decode the letter from the modified text alone, while an eavesdropper (a different LLM) cannot. The decoder is told only the task (recover the hidden letter) — neither encoder nor decoder are given any prior arrangement on the encoding scheme beyond the alphabet. We measure how accurately the encoder's own model family decodes the hidden letter compared to eavesdropping models from other families. We further formalize this gap using the wiretap channel framework [cite:@csiszar1978]: the difference in mutual information between the self-decoder and eavesdropper channels lower bounds the secrecy capacity.
+An encoder model is told it is playing a Schelling point game with another copy of itself: it must hide one of 26 letters (A-Z) in a sentence using only stylistic changes, so that a second copy of the model can decode the letter from the modified text alone, while an eavesdropper (a different LLM) cannot. The decoder is told only the task (recover the hidden letter) — neither encoder nor decoder are given any prior arrangement on the encoding scheme beyond the alphabet. We measure how accurately the encoder's own model family decodes the hidden letter compared to eavesdropping models from other families or from weaker models. We further formalize this gap using the wiretap channel framework [cite:@csiszar1978]: the difference in mutual information between the self-decoder and eavesdropper channels lower bounds the secrecy capacity.
 
-Opus 4.6 and Gemini 3.1 Pro show significant secrecy capacity against weaker eavesdroppers: Opus 4.6 has Δ ≈ 2.0 bits against Haiku and Gemini Flash, meaning its encodings are effectively invisible to these models. However, Gemini 3.1 Pro is a remarkably strong eavesdropper — it decodes Opus 4.6's steganography better than Opus 4.6 decodes itself (926/1319, 70% vs 2777/4422, 63%), and similarly for Opus 4.5 (763/1277, 60% vs 1861/4360, 43%) and Sonnet 4 (336/1136, 30% vs 661/4178, 16%), eliminating secrecy entirely against this eavesdropper. Surprisingly, GPT-5.4 cannot self-decode above chance (204/4958, 4.1%).
+Key results:
+@TODO Update after results come back.
 
-This model is a leaky abstraction for steganography bypassing monitors, and we discuss its flaws as well; however, the hope is that it gives some signal for models' capacity to coordinate in a way that is invisible to monitors.
+- **Opus 4.6 and Gemini 3.1 Pro show significant secrecy capacity against weaker eavesdroppers:** Opus 4.6 self-decodes at 2777/4422 (63%) but Haiku only gets 572/4420 (13%) and Gemini Flash 544/3923 (14%). Gemini 3.1 Pro self-decodes at 1387/2344 (59%) but Haiku only gets 524/2794 (19%) and Gemini Flash 417/2512 (17%).
+
+- **Gemini 3.1 Pro is a strong encoder:** Opus 4.6 eavesdrops Gemini at 1497/2796 (54%), Opus 4.5 at 1365/2803 (49%), Sonnet 4 at 821/2803 (29%) — all below Gemini's self-decode rate of 59%.
+
+- **Gemini 3.1 Pro is a remarkably strong eavesdropper** — it decodes Opus 4.6's steganography at 1109/1631 (68%) vs Opus 4.6 self-decode 2777/4422 (63%), and Opus 4.5 at 763/1277 (60%) vs self-decode 1861/4360 (43%). *Caveat: Gemini eavesdrop numbers are from an incomplete sample (1631/4427 for Opus 4.6) — the full run is still in progress and these may be biased upward.*
+
+- **GPT-5.4 cannot self-decode above chance** (204/4958, 4.1%), and when offered thinking it refuses to play the game. This is likely an elicitation problem.
+
+We examine the encoding strategies by passing encoder chain-of-thought to Claude and asking it to produce a decoding algorithm. For the 26-letter alphabet, Claude identifies first-letter restructuring as the primary strategy, but the resulting algorithm (1491/4427) falls well short of Opus 4.6's self-decode accuracy (2777/4422). Per-letter analysis shows why: the algorithm succeeds on letters with common starting words (A: 74%, T: 63%) but fails on rare letters (X: 0%, Z: 4%), while Opus maintains more uniform accuracy across the alphabet, suggesting it uses a mix of strategies.
+
+# This model is a leaky abstraction for steganography bypassing monitors, and we discuss its flaws as well; however, the hope is that it gives some signal for models' capacity to coordinate in a way that is invisible to monitors.
 
 #+begin_src python
 import numpy as np
@@ -70,8 +81,13 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260327_185146_2881263.png]]
-Cell Timer: 0:03:37
+
+
+
+
+
+[[file:plots/SchellingSteganography/plot_20260327_214326_4427793.png]]
+Cell Timer: 0:03:29
 :end:
 
 #+begin_src python
@@ -121,8 +137,9 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260327_185533_7480546.png]]
-Cell Timer: 0:03:46
+
+[[file:plots/SchellingSteganography/plot_20260327_214721_3506290.png]]
+Cell Timer: 0:03:54
 :end:
 
 * Related work
@@ -228,7 +245,7 @@ print(df)
 Cell Timer: 0:00:01
 :end:
 
-* Results
+* Core Results
 
 We test whether different frontier LLMs develop Schelling conventions for steganographic encoding. As explained above, each model encodes letters into Wikipedia seed texts, using prompts in the appendix for encoder and decoder. We measure self-decode accuracy vs eavesdropper accuracy across model families.
 
@@ -281,9 +298,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-[[file:plots/SchellingSteganography/plot_20260327_185920_3838472.png]]
-Cell Timer: 0:03:45
+[[file:plots/SchellingSteganography/plot_20260327_215050_5700501.png]]
+Cell Timer: 0:03:28
 :end:
 
 #+begin_src python
@@ -330,9 +346,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-[[file:plots/SchellingSteganography/plot_20260327_190247_2454459.png]]
-Cell Timer: 0:03:26
+[[file:plots/SchellingSteganography/plot_20260327_215426_7437145.png]]
+Cell Timer: 0:03:36
 :end:
 
 *** Accuracy gaps
@@ -368,21 +383,13 @@ print(df)
 
 #+RESULTS:
 :results:
-
-| idx | Encoder        | Self-decode  | Δ vs Opus 4.6  | Δ vs Sonnet 4  | Δ vs Haiku     | Δ vs Gemini Flash | Δ vs Gemini 3.1 Pro | Δ vs GPT-5.4 |
-|-----+----------------+--------------+----------------+----------------+----------------+-------------------+---------------------+--------------|
-|   0 | GPT-5.4        | 4.1% (4958)  | +0.0pp (4958)  | -0.3pp (4958)  | +0.2pp (4954)  | —                 | —                   | —            |
-|   1 | Gemini 3.1 Pro | 60.0% (1460) | +6.5pp (2796)  | +30.7pp (2803) | +41.2pp (2794) | +43.4pp (2512)    | —                   | —            |
-|   2 | Opus 4.5       | 42.7% (4360) | -10.9pp (4360) | +20.7pp (4360) | +31.5pp (4351) | +30.1pp (3769)    | -17.1pp (1277)      | —            |
-|   3 | Opus 4.6       | 62.8% (4422) | —              | +35.0pp (4422) | +49.9pp (4420) | +48.9pp (3923)    | -7.4pp (1319)       | —            |
-|   4 | Sonnet 4       | 15.8% (4178) | -9.6pp (4179)  | —              | +5.8pp (4179)  | +6.4pp (3679)     | -13.8pp (1136)      | —            |
-Cell Timer: 0:03:10
+7af23ef0-8454-45c6-a49e-6623ca162895
 :end:
 
 
-** Secrecy analysis (mutual information)
+** Secrecy gap
 
-MI has the advantage of a direct connection to secrecy against eavesdroppers, and the disadvantage that MI is quadratically harder to estimate as the alphabet size grows, and bootstrapping is known to be unreliable for CI estimation of mutual information. We have N around 3-5k, while $|\mathcal{A}|^2 = 676$, roughly in the regime where these estimates are considered trustworthy for point estimates but not for confidence intervals.
+Mutual information has the advantage of a direct connection to information theoretic secrecy against eavesdroppers, and the disadvantage that MI is quadratically harder to estimate as the alphabet size grows, and bootstrapping is known to be unreliable for CI estimation of mutual information. We have N around 3-5k, while $|\mathcal{A}|^2 = 676$, which is around the suggested regime (see also appendix).
 
 #+begin_src python
 import numpy as np
@@ -453,17 +460,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-*Secrecy capacity lower bounds (bits per trial, max = log2(26) = 4.7). Δ = I(X;G_self) - I(X;G_eaves).*
-| idx | Encoder        | I(X;G_self) | Δ vs Opus 4.6 | Δ vs Sonnet 4 | Δ vs Haiku | Δ vs Gemini Flash | Δ vs Gemini 3.1 Pro | Δ vs GPT-5.4 |
-|-----+----------------+-------------+---------------+---------------+------------+-------------------+---------------------+--------------|
-|   0 | GPT-5.4        |        0.10 |         -0.00 |         -0.01 |       0.00 |                 — |                   — | —            |
-|   1 | Gemini 3.1 Pro |        2.29 |          0.21 |          1.32 |       1.68 |              1.72 |                   — | —            |
-|   2 | Opus 4.5       |        1.23 |         -0.51 |          0.77 |       1.04 |              0.98 |               -0.73 | —            |
-|   3 | Opus 4.6       |        2.20 |             — |          1.57 |       1.98 |              1.94 |               -0.26 | —            |
-|   4 | Sonnet 4       |        0.30 |         -0.28 |             — |       0.12 |              0.14 |               -0.43 | —            |
-[[file:plots/SchellingSteganography/plot_20260327_191221_8279172.png]]
-Cell Timer: 0:06:23
+ce9025e3-7007-40d8-aab8-cfe0e56cf605
 :end:
 
 #+begin_src python
@@ -506,18 +503,10 @@ print(pd.DataFrame(rows))
 
 #+RESULTS:
 :results:
-*Secrecy p-values (permutation test, 10k permutations). p < 0.05 rejects H0: MI(self) \leq MI(eaves).*
-| idx | Encoder        | Self-decode     | I(X;G_self) | p vs Opus 4.6 | p vs Sonnet 4 | p vs Haiku | p vs Gemini Flash | p vs Gemini 3.1 Pro | p vs GPT-5.4 |
-|-----+----------------+-----------------+-------------+---------------+---------------+------------+-------------------+---------------------+--------------|
-|   0 | GPT-5.4        | 204/4958 (4%)   |        0.10 |        0.5783 |        0.9096 |     0.3556 |                 — |                   — | —            |
-|   1 | Gemini 3.1 Pro | 876/1460 (60%)  |        2.29 |        0.0000 |        0.0000 |     0.0000 |            0.0000 |                   — | —            |
-|   2 | Opus 4.5       | 1861/4360 (43%) |        1.23 |        1.0000 |        0.0000 |     0.0000 |            0.0000 |              1.0000 | —            |
-|   3 | Opus 4.6       | 2777/4422 (63%) |        2.20 |             — |        0.0000 |     0.0000 |            0.0000 |              1.0000 | —            |
-|   4 | Sonnet 4       | 661/4178 (16%)  |        0.30 |        1.0000 |             — |     0.0000 |            0.0000 |              1.0000 | —            |
-Cell Timer: 0:03:59
+1be5f339-94cc-4987-9b62-300da30e6af9
 :end:
 
-* Alphabets
+* Varying the Alphabet
 
 The alphabet has a significant effect on the secrecy capacity of channels.
 
@@ -744,7 +733,7 @@ Cell Timer: 0:02:01
 
 Using a "common English word" could yield much higher channel capacity, but the secrecy capacity tanks because the encoder model chooses an obvious encoding such that weaker model is trivially able to break the code.
 
-There is also the problem that you would need an *astronomical* number of samples to estimate the mutual information (see Note on MI estimation); for this reason we do not even both to try to estimate the secrecy capacity.
+There is also the problem that you would need an *astronomical* number of samples to estimate the mutual information (see Note on MI estimation); for this reason we do not even bother to try to estimate the secrecy capacity.
 
 #+begin_src python
 import numpy as np
@@ -795,7 +784,6 @@ plt.show()
 [[file:plots/SchellingSteganography/plot_20260327_192543_1343974.png]]
 Cell Timer: 0:00:48
 :end:
-
 
 * What are the models doing?
 
@@ -884,8 +872,79 @@ plt.show()
 
 #+RESULTS:
 :results:
+[[file:plots/SchellingSteganography/plot_20260327_205507_687630.png]]
+Cell Timer: 0:00:07
+:end:
 
-[[file:plots/SchellingSteganography/plot_20260327_192631_6634058.png]]
+Per-letter accuracy reveals that the algorithm's first-letter strategy is highly non-uniform — it succeeds on letters with common starting words (T, S, A) but fails on rare letters (X, Z, Q). Opus 4.6 has a more uniform profile, indicating it uses additional strategies beyond first-letter restructuring:
+
+#+begin_src python
+import sqlite3, re, string
+import numpy as np
+import matplotlib.pyplot as plt
+conn = sqlite3.connect('results/stego.db')
+
+rows = conn.execute('''
+    SELECT t.trial_idx, t.symbol, t.encoded_text, d.decoder_model, d.decoded_symbol
+    FROM trials t
+    JOIN decodes d ON d.trial_idx = t.trial_idx
+        AND d.encoder_model = t.encoder_model
+        AND d.prompt_type = t.prompt_type
+        AND d.seed_set = t.seed_set
+    WHERE t.encoder_model = "Opus 4.6"
+        AND t.prompt_type = 'alphabet'
+        AND t.seed_set = 'wikipedia'
+        AND t.meaning_preserved = 1
+        AND d.decoded_symbol IS NOT NULL
+''').fetchall()
+
+trials = {}
+for trial_idx, sym, enc, dm, ds in rows:
+    if trial_idx not in trials:
+        trials[trial_idx] = {'symbol': sym, 'encoded': enc, 'decoders': {}}
+    trials[trial_idx]['decoders'][dm] = ds
+
+letters = list(string.ascii_uppercase)
+
+# Per-letter accuracy for algorithm and Opus 4.6
+algo_acc = []
+opus_acc = []
+algo_counts = []
+for letter in letters:
+    letter_trials = [t for t in trials.values() if t['symbol'] == letter]
+    n = len(letter_trials)
+    if n == 0:
+        algo_acc.append(0)
+        opus_acc.append(0)
+        algo_counts.append(0)
+        continue
+    algo_c = sum(1 for t in letter_trials if t['encoded'].strip()[0] == letter)
+    opus_c = sum(1 for t in letter_trials if t['decoders'].get('Opus 4.6') == letter)
+    algo_acc.append(algo_c / n)
+    opus_acc.append(opus_c / n)
+    algo_counts.append(n)
+
+x = np.arange(len(letters))
+width = 0.35
+
+fig, ax = plt.subplots(figsize=(12, 4))
+ax.bar(x - width/2, algo_acc, width, label='Algorithm (first letter)', color='#d62728', alpha=0.8)
+ax.bar(x + width/2, opus_acc, width, label='Opus 4.6', color='#1f77b4', alpha=0.8)
+ax.axhline(y=1/26, color='gray', linestyle='--', alpha=0.5, label='Chance')
+ax.set_xticks(x)
+ax.set_xticklabels(letters, fontsize=9)
+ax.set_ylabel('Decode accuracy')
+ax.set_title('Per-letter decode accuracy: algorithm vs Opus 4.6 self-decode')
+ax.legend(fontsize=8)
+ax.set_ylim(0, 1.05)
+plt.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+
+[[file:plots/SchellingSteganography/plot_20260327_205500_7329643.png]]
 Cell Timer: 0:00:08
 :end:
 
@@ -1272,7 +1331,7 @@ print(df)
 Cell Timer: 0:00:21
 :end:
 
-* Conclusions
+* Conclusions and follow up
 
 - Models can communicate steganographically with themselves, in ways that are not entirely obvious, and that more capable models are better at doing this to a degree that gives them a secrecy advantage. (Though they are not even good at this, e.g. GPT-5.4 is remarkably bad at this task.)
 
@@ -1289,6 +1348,8 @@ Confounders:
 Follow ups: 
 
 - To avoid the training data confound, it could be worthwhile to vary the encoding data further. For instance, asking for steganographically encoding letters inside solutions to coding evals, or Q&A responses as in Roger 2023.
+
+- Surely better elicitation would make Gpt-5.4 better at this game.
   
 - It's possible that coordination is related to RL training, instead of being directly a function of capacity, as Puri et al. [cite:@puri2025reaching] explore. It could be interesting to see if measure how much different kinds of RL training impacts model performance on these tasks.
   
