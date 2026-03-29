@@ -73,6 +73,7 @@ MODELS = {
     "o3-mini": {"model_id": "openai/o3-mini", "backend": "openrouter", "thinking_budget": None},
     "o4-mini": {"model_id": "openai/o4-mini", "backend": "openrouter", "thinking_budget": None},
     "Gemini 3.1 Pro": {"model_id": "google/gemini-3.1-pro-preview", "backend": "openrouter", "thinking_budget": None},
+    "Gemini 3.1 Pro (continued)": {"model_id": "google/gemini-3.1-pro-preview", "backend": "openrouter", "thinking_budget": None},
     "Gemini Flash": {"model_id": "google/gemini-2.5-flash", "backend": "openrouter", "thinking_budget": None},
     "GPT-5.4": {"model_id": "openai/gpt-5.4", "backend": "openrouter", "thinking_budget": None},
     "GPT-5.4 (thinking)": {"model_id": "openai/gpt-5.4", "backend": "openrouter", "thinking_budget": None, "reasoning": True},
@@ -140,7 +141,7 @@ def generate_symbols(prompt_type, n):
         return [random.choice(COMMON_WORDS) for _ in range(n)]
     elif prompt_type == "digit":
         return [str(random.randint(0, 9)) for _ in range(n)]
-    elif prompt_type == "alphabet":
+    elif prompt_type in ("alphabet", "alphabet_subtle", "alphabet_subtle2"):
         return [random.choice(string.ascii_uppercase) for _ in range(n)]
     else:
         return [str(random.randint(0, 1)) for _ in range(n)]
@@ -215,6 +216,8 @@ RESPONSE_PARSERS = {
     "adversarial": parse_bit,
     "code": parse_bit,
     "alphabet": parse_letter,
+    "alphabet_subtle": parse_letter,
+    "alphabet_subtle2": parse_letter,
     "digit": parse_digit,
     "word": parse_word,
 }
@@ -224,6 +227,8 @@ OR_SYSTEM_PROMPTS = {
     "adversarial": "bit",
     "code": "bit",
     "alphabet": "letter",
+    "alphabet_subtle": "letter",
+    "alphabet_subtle2": "letter",
     "digit": "digit",
     "word": "word",
 }
@@ -664,7 +669,7 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
                 prompt = decoder_prompt_template.format(sentence=encoded_text)
                 return trial_idx, encoded_text, openrouter_call(
                     http_client, _mid, prompt,
-                    system_prompt=_sys, max_tokens=8000, reasoning=_reas)
+                    system_prompt=_sys, max_tokens=16000, reasoning=_reas)
             n_done = 0
             with ThreadPoolExecutor(max_workers=50) as pool:
                 futures = {pool.submit(_decode_or, item): item for item in needs}
@@ -758,7 +763,7 @@ def main():
 
     # Clients
     client = anthropic.Anthropic()
-    http_client = httpx.Client(timeout=httpx.Timeout(120.0, connect=10.0))
+    http_client = httpx.Client(timeout=httpx.Timeout(600.0, connect=10.0))
 
     print(f"Encoding: {', '.join(model_labels)}")
     print(f"Decoding: {', '.join(all_decoders)}")

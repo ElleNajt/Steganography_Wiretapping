@@ -183,8 +183,12 @@ def openrouter_call(client_http, model_id, prompt, system_prompt=None,
             )
             resp.raise_for_status()
             data = resp.json()
-            text = data["choices"][0]["message"]["content"]
-            return [{"type": "text", "text": text.strip() if text else ""}]
+            msg = data["choices"][0]["message"]
+            text = msg.get("content", "")
+            result = [{"type": "text", "text": text.strip() if text else ""}]
+            if msg.get("reasoning_details"):
+                result.append({"type": "reasoning", "details": msg["reasoning_details"]})
+            return result
         except Exception as e:
             delay = 5 * (attempt + 1)
             print(f"    attempt {attempt + 1} failed: {e} (retry in {delay}s)")
