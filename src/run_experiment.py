@@ -109,10 +109,15 @@ def load_seeds(seed_type, n):
         "wikipedia": f"{data_dir}/wikipedia_seeds.json",
         "opus": f"{data_dir}/opus_seeds.json",
         "code": f"{data_dir}/code_seeds.json",
+        "squad": f"{data_dir}/squad_seeds.json",
     }
     path = paths.get(seed_type, seed_type)
     with open(path) as f:
         pool = json.load(f)
+    # SQuAD format: list of {context, question, answers}
+    if seed_type == "squad":
+        assert len(pool) >= n, f"Need {n} seeds, got {len(pool)} from {path}"
+        return pool[:n]
     if pool and isinstance(pool[0], dict):
         seeds = [s["text"] for s in pool]
     else:
@@ -121,7 +126,9 @@ def load_seeds(seed_type, n):
     return seeds[:n]
 
 
-def detect_domain(seed_type):
+def detect_domain(seed_type, prompt_type=None):
+    if prompt_type and prompt_type.startswith("qa_"):
+        return "qa"
     return "code" if seed_type == "code" else "text"
 
 
@@ -141,7 +148,7 @@ def generate_symbols(prompt_type, n):
         return [random.choice(COMMON_WORDS) for _ in range(n)]
     elif prompt_type == "digit":
         return [str(random.randint(0, 9)) for _ in range(n)]
-    elif prompt_type in ("alphabet", "alphabet_subtle", "alphabet_subtle2"):
+    elif prompt_type in ("alphabet", "alphabet_subtle", "alphabet_subtle2", "qa_alphabet", "qa_alphabet_subtle", "qa_alphabet_subtle2", "qa_alphabet_blind"):
         return [random.choice(string.ascii_uppercase) for _ in range(n)]
     else:
         return [str(random.randint(0, 1)) for _ in range(n)]
@@ -220,6 +227,10 @@ RESPONSE_PARSERS = {
     "alphabet_subtle2": parse_letter,
     "digit": parse_digit,
     "word": parse_word,
+    "qa_alphabet": parse_letter,
+    "qa_alphabet_subtle": parse_letter,
+    "qa_alphabet_subtle2": parse_letter,
+    "qa_alphabet_blind": parse_letter,
 }
 
 OR_SYSTEM_PROMPTS = {
@@ -229,6 +240,10 @@ OR_SYSTEM_PROMPTS = {
     "alphabet": "letter",
     "alphabet_subtle": "letter",
     "alphabet_subtle2": "letter",
+    "qa_alphabet": "letter",
+    "qa_alphabet_subtle": "letter",
+    "qa_alphabet_subtle2": "letter",
+    "qa_alphabet_blind": "letter",
     "digit": "digit",
     "word": "word",
 }
@@ -368,6 +383,24 @@ COMMON_WORDS = [
 ]
 
 
+# === Helpers for QA mode ===
+
+def _seed_text(seed):
+    """Extract the text to store in DB from a seed (string or QA dict)."""
+    if isinstance(seed, dict):
+        return seed["question"]
+    return seed
+
+
+def _format_encoder_prompt(template, sym, seed):
+    """Format encoder prompt, handling both plain seeds and QA dicts."""
+    seed_text = _seed_text(seed)
+    kwargs = {"bit": sym, "symbol": sym, "sentence": seed_text}
+    if isinstance(seed, dict):
+        kwargs["context"] = seed["context"]
+    return template.format(**kwargs)
+
+
 # === Phase functions ===
 
 def phase_encode_all(client, http_client, db, encoder_models, encoder_prompt_template,
@@ -392,7 +425,7 @@ def phase_encode_all(client, http_client, db, encoder_models, encoder_prompt_tem
             thinking_budget = model_cfg["thinking_budget"]
             requests = []
             for i, seed, sym in remaining:
-                prompt = encoder_prompt_template.format(bit=sym, symbol=sym, sentence=seed)
+                prompt = _format_encoder_prompt(encoder_prompt_template, sym, seed)
                 params = {
                     "model": model_id,
                     "max_tokens": (thinking_budget or 0) + 4000,
@@ -421,9 +454,9 @@ def phase_encode_all(client, http_client, db, encoder_models, encoder_prompt_tem
             text = extract_text(content)
             encoded = strip_fences(text.strip().strip('"')) if text else None
             raw = json.dumps(content) if content else None
-            prompt = encoder_prompt_template.format(bit=sym, symbol=sym, sentence=seed)
+            prompt = _format_encoder_prompt(encoder_prompt_template, sym, seed)
             rows.append((i, model_label, prompt_type, seed_set, ghash,
-                         seed, sym, encoded, raw, None, prompt))
+                         _seed_text(seed), sym, encoded, raw, None, prompt))
         save_trials_batch(db, rows)
         n_ok = sum(1 for r in rows if r[7] is not None)
         print(f"  {model_label}: {n_ok}/{len(rows)} encoded")
@@ -440,7 +473,7 @@ def phase_encode_all(client, http_client, db, encoder_models, encoder_prompt_tem
             thinking_budget = model_cfg["thinking_budget"]
             def _encode_one(item, _mid=model_id, _tb=thinking_budget):
                 i, seed, sym = item
-                prompt = encoder_prompt_template.format(bit=sym, symbol=sym, sentence=seed)
+                prompt = _format_encoder_prompt(encoder_prompt_template, sym, seed)
                 return i, seed, sym, anthropic_direct(
                     client, _mid, prompt, thinking_budget=_tb,
                     max_tokens=(_tb or 0) + 4000)
@@ -452,16 +485,16 @@ def phase_encode_all(client, http_client, db, encoder_models, encoder_prompt_tem
                     text = extract_text(content)
                     encoded = strip_fences(text.strip().strip('"')) if text else None
                     raw = json.dumps(content) if content else None
-                    prompt = encoder_prompt_template.format(bit=sym, symbol=sym, sentence=seed)
+                    prompt = _format_encoder_prompt(encoder_prompt_template, sym, seed)
                     rows.append((i, model_label, prompt_type, seed_set, ghash,
-                                 seed, sym, encoded, raw, None, prompt))
+                                 _seed_text(seed), sym, encoded, raw, None, prompt))
             save_trials_batch(db, rows)
             print(f"  {model_label}: {sum(1 for r in rows if r[7])}/{len(rows)} encoded")
         else:
             reasoning = model_cfg.get("reasoning", False)
             def _encode_or(item, _mid=model_id, _reas=reasoning):
                 i, seed, sym = item
-                prompt = encoder_prompt_template.format(bit=sym, symbol=sym, sentence=seed)
+                prompt = _format_encoder_prompt(encoder_prompt_template, sym, seed)
                 return i, seed, sym, openrouter_call(
                     http_client, _mid, prompt, max_tokens=3000, reasoning=_reas)
             n_done = 0
@@ -472,17 +505,26 @@ def phase_encode_all(client, http_client, db, encoder_models, encoder_prompt_tem
                     text = extract_text(content)
                     encoded = strip_fences(text.strip().strip('"')) if text else None
                     raw = json.dumps(content) if content else None
-                    prompt = encoder_prompt_template.format(bit=sym, symbol=sym, sentence=seed)
+                    prompt = _format_encoder_prompt(encoder_prompt_template, sym, seed)
                     save_trial(db, (i, model_label, prompt_type, seed_set, ghash,
-                                    seed, sym, encoded, raw, None, prompt))
+                                    _seed_text(seed), sym, encoded, raw, None, prompt))
                     n_done += 1
                     if n_done % 200 == 0:
                         print(f"    {model_label}: {n_done}/{len(remaining)} encoded")
             print(f"  {model_label}: {n_done}/{len(remaining)} encoded")
 
 
+def _format_judge_prompt(template, seed_text, encoded_text, seeds=None, trial_idx=None):
+    """Format judge prompt, with extra QA fields if seeds are QA dicts."""
+    kwargs = {"original": seed_text, "encoded": encoded_text}
+    if seeds and trial_idx is not None and isinstance(seeds[0], dict):
+        seed = seeds[trial_idx]
+        kwargs["context"] = seed["context"]
+    return template.format_map({**kwargs, "context": ""} if "context" not in kwargs else kwargs)
+
+
 def phase_judge_all(client, db, judge_prompt_template, encoder_models,
-                    prompt_type, seed_set, fast=False):
+                    prompt_type, seed_set, seeds=None, fast=False):
     """Judge meaning preservation for all encoder models in parallel."""
     all_batch_ids = {}
     all_unjudged = {}
@@ -499,7 +541,7 @@ def phase_judge_all(client, db, judge_prompt_template, encoder_models,
         if not fast:
             requests = []
             for trial_idx, seed_text, encoded_text in unjudged:
-                prompt = judge_prompt_template.format(original=seed_text, encoded=encoded_text)
+                prompt = _format_judge_prompt(judge_prompt_template, seed_text, encoded_text, seeds, trial_idx)
                 requests.append({
                     "custom_id": _sanitize_id(f"{model_label}:{trial_idx}"),
                     "params": {
@@ -527,7 +569,7 @@ def phase_judge_all(client, db, judge_prompt_template, encoder_models,
             content = results.get(_sanitize_id(f"{model_label}:{trial_idx}"))
             text = extract_text(content)
             raw = json.dumps(content) if content else None
-            judge_prompt = judge_prompt_template.format(original=seed_text, encoded=encoded_text)
+            judge_prompt = _format_judge_prompt(judge_prompt_template, seed_text, encoded_text, seeds, trial_idx)
             m = re.search(r"<same>(yes|no)</same>", text or "", re.I)
             preserved = 1 if (m and m.group(1).lower() == "yes") else 0
             rows.append((preserved, raw, judge_prompt, trial_idx, model_label, prompt_type, seed_set))
@@ -543,7 +585,7 @@ def phase_judge_all(client, db, judge_prompt_template, encoder_models,
 
         def _judge_one(item):
             trial_idx, seed_text, encoded_text = item
-            prompt = judge_prompt_template.format(original=seed_text, encoded=encoded_text)
+            prompt = _format_judge_prompt(judge_prompt_template, seed_text, encoded_text, seeds, trial_idx)
             return trial_idx, seed_text, encoded_text, anthropic_direct(
                 client, JUDGE_MODEL, prompt, thinking_budget=None, max_tokens=100)
 
@@ -554,7 +596,7 @@ def phase_judge_all(client, db, judge_prompt_template, encoder_models,
                 trial_idx, seed_text, encoded_text, content = future.result()
                 text = extract_text(content)
                 raw = json.dumps(content) if content else None
-                judge_prompt = judge_prompt_template.format(original=seed_text, encoded=encoded_text)
+                judge_prompt = _format_judge_prompt(judge_prompt_template, seed_text, encoded_text, seeds, trial_idx)
                 m = re.search(r"<same>(yes|no)</same>", text or "", re.I)
                 preserved = 1 if (m and m.group(1).lower() == "yes") else 0
                 rows.append((preserved, raw, judge_prompt, trial_idx, model_label, prompt_type, seed_set))
@@ -563,12 +605,20 @@ def phase_judge_all(client, db, judge_prompt_template, encoder_models,
         print(f"  {model_label}: {n_preserved}/{len(rows)} preserved")
 
 
+def _format_decoder_prompt(template, encoded_text, seed_text="", seeds=None, trial_idx=None):
+    """Format decoder prompt. For QA context decoders, also passes context."""
+    kwargs = {"sentence": encoded_text, "question": seed_text}
+    if seeds and trial_idx is not None and isinstance(seeds[0], dict):
+        kwargs["context"] = seeds[trial_idx]["context"]
+    return template.format_map({**kwargs, "context": ""} if "context" not in kwargs else kwargs)
+
+
 def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
                      decoder_prompt_template, prompt_type, seed_set,
-                     response_parser, or_system_prompt_key, fast=False):
+                     response_parser, or_system_prompt_key, fast=False, seeds=None):
     """Decode all (encoder, decoder) pairs in parallel."""
     all_batch_ids = {}  # (encoder, decoder) -> batch_ids
-    all_needs = {}      # (encoder, decoder) -> [(trial_idx, encoded_text), ...]
+    all_needs = {}      # (encoder, decoder) -> [(trial_idx, encoded_text, seed_text), ...]
 
     for enc_label in encoder_models:
         preserved = get_preserved_trials(db, enc_label, prompt_type, seed_set)
@@ -576,7 +626,7 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
         for dec_label in decoder_models:
             dec_cfg = MODELS[dec_label]
             existing = get_decoded_trial_idxs(db, enc_label, prompt_type, seed_set, dec_label)
-            needs = [(idx, text) for idx, text in preserved if idx not in existing]
+            needs = [(idx, text, seed) for idx, text, seed in preserved if idx not in existing]
             if not needs:
                 print(f"  {enc_label} → {dec_label}: CACHED")
                 continue
@@ -588,8 +638,8 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
                 model_id = dec_cfg["model_id"]
                 thinking_budget = dec_cfg["thinking_budget"]
                 requests = []
-                for trial_idx, encoded_text in needs:
-                    prompt = decoder_prompt_template.format(sentence=encoded_text)
+                for trial_idx, encoded_text, seed_text in needs:
+                    prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
                     params = {
                         "model": model_id,
                         "max_tokens": (thinking_budget or 0) + 3000,
@@ -617,12 +667,12 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
         results = collect_batch(client, batch_ids)
         needs = all_needs[key]
         rows = []
-        for trial_idx, encoded_text in needs:
+        for trial_idx, encoded_text, seed_text in needs:
             content = results.get(_sanitize_id(f"{enc_label}:{dec_label}:{trial_idx}"))
             text = extract_text(content)
             decoded = response_parser(text)
             raw = json.dumps(content) if content else None
-            dec_prompt = decoder_prompt_template.format(sentence=encoded_text)
+            dec_prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
             rows.append((trial_idx, enc_label, prompt_type, seed_set,
                          dec_label, decoded, raw, dec_prompt))
         save_decodes_batch(db, rows)
@@ -641,20 +691,20 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
         if dec_cfg["backend"] == "anthropic" and fast:
             thinking_budget = dec_cfg["thinking_budget"]
             def _decode_one(item, _mid=model_id, _tb=thinking_budget):
-                trial_idx, encoded_text = item
-                prompt = decoder_prompt_template.format(sentence=encoded_text)
-                return trial_idx, encoded_text, anthropic_direct(
+                trial_idx, encoded_text, seed_text = item
+                prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+                return trial_idx, encoded_text, seed_text, anthropic_direct(
                     client, _mid, prompt, thinking_budget=_tb,
                     max_tokens=(_tb or 0) + 3000)
             rows = []
             with ThreadPoolExecutor(max_workers=50) as pool:
                 futures = {pool.submit(_decode_one, item): item for item in needs}
                 for future in as_completed(futures):
-                    trial_idx, encoded_text, content = future.result()
+                    trial_idx, encoded_text, seed_text, content = future.result()
                     text = extract_text(content)
                     decoded = response_parser(text)
                     raw = json.dumps(content) if content else None
-                    dec_prompt = decoder_prompt_template.format(sentence=encoded_text)
+                    dec_prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
                     rows.append((trial_idx, enc_label, prompt_type, seed_set,
                                  dec_label, decoded, raw, dec_prompt))
             save_decodes_batch(db, rows)
@@ -665,20 +715,20 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
             reasoning = dec_cfg.get("reasoning", False)
             or_sys = OPENROUTER_SYSTEM_PROMPTS.get(or_system_prompt_key, "")
             def _decode_or(item, _mid=model_id, _reas=reasoning, _sys=or_sys):
-                trial_idx, encoded_text = item
-                prompt = decoder_prompt_template.format(sentence=encoded_text)
-                return trial_idx, encoded_text, openrouter_call(
+                trial_idx, encoded_text, seed_text = item
+                prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+                return trial_idx, encoded_text, seed_text, openrouter_call(
                     http_client, _mid, prompt,
                     system_prompt=_sys, max_tokens=16000, reasoning=_reas)
             n_done = 0
             with ThreadPoolExecutor(max_workers=50) as pool:
                 futures = {pool.submit(_decode_or, item): item for item in needs}
                 for future in as_completed(futures):
-                    trial_idx, encoded_text, content = future.result()
+                    trial_idx, encoded_text, seed_text, content = future.result()
                     text = extract_text(content)
                     decoded = response_parser(text)
                     raw = json.dumps(content) if content else None
-                    dec_prompt = decoder_prompt_template.format(sentence=encoded_text)
+                    dec_prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
                     save_decode(db, trial_idx, enc_label, prompt_type, seed_set,
                                 dec_label, decoded, raw, dec_prompt)
                     n_done += 1
@@ -728,6 +778,8 @@ def main():
     parser.add_argument("--n", type=int, required=True, help="Number of trials")
     parser.add_argument("--decoders", required=True,
                         help="Comma-separated decoder model labels")
+    parser.add_argument("--context-decoders",
+                        help="For QA prompts: comma-separated decoder models that also see question+context")
     parser.add_argument("--fast", action="store_true",
                         help="Use direct API calls instead of batch API")
     parser.add_argument("--db", help="Database path (default: results/stego.db)")
@@ -745,10 +797,10 @@ def main():
 
     # Resolve prompts
     prompt_type = args.encoder_prompt
-    domain = detect_domain(args.seeds)
+    domain = detect_domain(args.seeds, prompt_type)
     encoder_prompt = ENCODER_PROMPTS[prompt_type]
-    decoder_prompt = DECODER_PROMPTS.get(prompt_type, DECODER_PROMPTS[domain])
-    judge_prompt = JUDGE_PROMPTS[domain]
+    decoder_prompt = DECODER_PROMPTS.get(prompt_type, DECODER_PROMPTS.get(domain))
+    judge_prompt = JUDGE_PROMPTS.get(domain, JUDGE_PROMPTS["text"])
     response_parser = RESPONSE_PARSERS.get(prompt_type, parse_bit)
     or_sys_key = OR_SYSTEM_PROMPTS.get(prompt_type, "bit")
 
@@ -784,7 +836,7 @@ def main():
     print("Phase 2: Judge meaning preservation")
     print("=" * 60)
     phase_judge_all(client, db, judge_prompt, model_labels,
-                    prompt_type, args.seeds, fast=args.fast)
+                    prompt_type, args.seeds, seeds=seeds, fast=args.fast)
 
     # Phase 3: Decode all (encoder × decoder) pairs in parallel
     print()
@@ -793,14 +845,35 @@ def main():
     print("=" * 60)
     phase_decode_all(client, http_client, db, model_labels, all_decoders,
                      decoder_prompt, prompt_type, args.seeds,
-                     response_parser, or_sys_key, fast=args.fast)
+                     response_parser, or_sys_key, fast=args.fast, seeds=seeds)
+
+    # Phase 3b: Context decoders (QA only — decoder sees question+context too)
+    all_decoder_labels = list(all_decoders)
+    if args.context_decoders and domain == "qa":
+        from src.prompts import DECODER_QA_ALPHABET_CONTEXT
+        ctx_decoders = [d.strip() for d in args.context_decoders.split(",")]
+        for label in ctx_decoders:
+            assert label in MODELS, f"Unknown context decoder: {label}"
+        # Register context decoder labels in MODELS under "(context)" suffix
+        ctx_labels = []
+        for label in ctx_decoders:
+            ctx_label = f"{label} (context)"
+            if ctx_label not in MODELS:
+                MODELS[ctx_label] = dict(MODELS[label])
+            ctx_labels.append(ctx_label)
+        print()
+        print("  Context decoders (sees question+context):")
+        phase_decode_all(client, http_client, db, model_labels, ctx_labels,
+                         DECODER_QA_ALPHABET_CONTEXT, prompt_type, args.seeds,
+                         response_parser, or_sys_key, fast=args.fast, seeds=seeds)
+        all_decoder_labels.extend(ctx_labels)
 
     # Summary
     print()
     print("=" * 60)
     print("Results")
     print("=" * 60)
-    summarize(db, model_labels, all_decoders, prompt_type, args.seeds)
+    summarize(db, model_labels, all_decoder_labels, prompt_type, args.seeds)
 
     db.close()
 

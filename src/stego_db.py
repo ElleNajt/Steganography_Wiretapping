@@ -192,9 +192,9 @@ def get_decoded_trial_idxs(conn, encoder_model, prompt_type, seed_set, decoder_m
 
 
 def get_preserved_trials(conn, encoder_model, prompt_type, seed_set):
-    """Return list of (trial_idx, encoded_text) for meaning-preserved trials."""
+    """Return list of (trial_idx, encoded_text, seed_text) for meaning-preserved trials."""
     rows = conn.execute(
-        """SELECT trial_idx, encoded_text FROM trials
+        """SELECT trial_idx, encoded_text, seed_text FROM trials
            WHERE encoder_model = ? AND prompt_type = ? AND seed_set = ?
            AND meaning_preserved = 1 AND encoded_text IS NOT NULL""",
         (encoder_model, prompt_type, seed_set),
