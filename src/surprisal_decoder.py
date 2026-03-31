@@ -91,7 +91,7 @@ def compute_surprisal(model, tokenizer, prefix, answer, device):
 
 
 def decode_trial(model, tokenizer, trial, device):
-    """Decode a single trial using surprisal."""
+    """Compute and save all per-token surprisals for a trial."""
     context = trial['context']
     question = trial['question']
     answer = trial['encoded_text']
@@ -108,40 +108,20 @@ def decode_trial(model, tokenizer, trial, device):
     if not words or not surprisals:
         return None
 
-    # Aggregate surprisal per word (sum of token surprisals)
-    n_words = len(words)
-    word_surprisal = [0.0] * n_words
-    word_token_count = [0] * n_words
-    for s, wi in zip(surprisals, token_to_word):
-        if wi < n_words:
-            word_surprisal[wi] += s
-            word_token_count[wi] += 1
-
-    # Normalize by token count (mean surprisal per token)
-    word_mean_surprisal = []
-    for i in range(n_words):
-        if word_token_count[i] > 0:
-            word_mean_surprisal.append(word_surprisal[i] / word_token_count[i])
-        else:
-            word_mean_surprisal.append(0.0)
-
-    # Pick word with highest mean surprisal
-    max_idx = max(range(n_words), key=lambda i: word_mean_surprisal[i])
-    chosen_word = words[max_idx]
-
-    # Extract first letter
-    first_letter = re.sub(r'[^a-zA-Z]', '', chosen_word)
-    if not first_letter:
-        return None
-
-    guess = first_letter[0].upper()
+    # Get token texts
+    answer_encoding = tokenizer(answer, return_offsets_mapping=True, add_special_tokens=False)
+    answer_offsets_local = answer_encoding['offset_mapping']
+    tokens = []
+    for idx, (start, end) in enumerate(answer_offsets_local):
+        tokens.append({
+            'text': answer[start:end],
+            'surprisal': round(surprisals[idx], 4),
+            'word_idx': token_to_word[idx] if idx < len(token_to_word) else -1,
+        })
 
     return {
-        'guess': guess,
-        'chosen_word': chosen_word,
-        'chosen_word_idx': max_idx,
-        'word_surprisals': {words[i]: round(word_mean_surprisal[i], 3) for i in range(n_words)},
-        'max_surprisal': round(word_mean_surprisal[max_idx], 3),
+        'words': words,
+        'tokens': tokens,
     }
 
 
@@ -168,45 +148,83 @@ def main():
 
     print(f"Processing {len(trials)} trials...")
     results = []
-    correct = {'qa_alphabet_blind': 0, 'qa_alphabet_subtle2': 0}
-    total = {'qa_alphabet_blind': 0, 'qa_alphabet_subtle2': 0}
+    correct = {'word': {}, 'token': {}}
+    total = {}
 
     for i, trial in enumerate(trials):
         result = decode_trial(model, tokenizer, trial, device)
         pt = trial['prompt_type']
+        total[pt] = total.get(pt, 0) + 1
+        for s in ['word', 'token']:
+            correct[s].setdefault(pt, 0)
+
         if result:
-            is_correct = result['guess'] == trial['symbol'].upper()
-            total[pt] += 1
-            if is_correct:
-                correct[pt] += 1
-            results.append({
+            target = trial['symbol'].upper()
+
+            # Compute guesses from raw surprisals for progress reporting
+            # Word-level: mean surprisal per word, guess first letter of most surprising word
+            from collections import defaultdict
+            word_surprisals = defaultdict(list)
+            for tok in result['tokens']:
+                if tok['word_idx'] >= 0:
+                    word_surprisals[tok['word_idx']].append(tok['surprisal'])
+            word_means = {wi: sum(s)/len(s) for wi, s in word_surprisals.items()}
+            if word_means:
+                max_word_idx = max(word_means, key=word_means.get)
+                chosen_word = result['words'][max_word_idx]
+                guess_word = chosen_word[0].upper() if chosen_word else None
+            else:
+                chosen_word, guess_word = None, None
+
+            # Token-level: first letter of most surprising single token
+            if result['tokens']:
+                max_tok = max(result['tokens'], key=lambda t: t['surprisal'])
+                chosen_token = max_tok['text'].strip()
+                guess_token = chosen_token[0].upper() if chosen_token else None
+            else:
+                chosen_token, guess_token = None, None
+
+            r = {
                 'trial_idx': trial['trial_idx'],
                 'symbol': trial['symbol'],
                 'prompt_type': pt,
-                'guess': result['guess'],
-                'correct': is_correct,
-                'chosen_word': result['chosen_word'],
-                'max_surprisal': result['max_surprisal'],
-            })
+                'words': result['words'],
+                'tokens': result['tokens'],
+                'guess_word': guess_word,
+                'guess_token': guess_token,
+                'correct_word': guess_word == target,
+                'correct_token': guess_token == target,
+            }
+            if r['correct_word']:
+                correct['word'][pt] += 1
+            if r['correct_token']:
+                correct['token'][pt] += 1
+            results.append(r)
         else:
             results.append({
                 'trial_idx': trial['trial_idx'],
                 'symbol': trial['symbol'],
                 'prompt_type': pt,
-                'guess': None,
-                'correct': False,
+                'words': None, 'tokens': None,
+                'guess_word': None, 'guess_token': None,
+                'correct_word': False, 'correct_token': False,
             })
-            total[pt] += 1
 
         if (i + 1) % 50 == 0:
-            for pt_key in correct:
+            for pt_key in total:
                 if total[pt_key] > 0:
-                    print(f"  [{i+1}/{len(trials)}] {pt_key}: {correct[pt_key]}/{total[pt_key]} ({100*correct[pt_key]/total[pt_key]:.1f}%)")
+                    w = correct['word'][pt_key]
+                    t = correct['token'][pt_key]
+                    n = total[pt_key]
+                    print(f"  [{i+1}/{len(trials)}] {pt_key}: word={w}/{n} ({100*w/n:.1f}%) token={t}/{n} ({100*t/n:.1f}%)")
 
     print(f"\nFinal results:")
-    for pt_key in correct:
+    for pt_key in total:
         if total[pt_key] > 0:
-            print(f"  {pt_key}: {correct[pt_key]}/{total[pt_key]} ({100*correct[pt_key]/total[pt_key]:.1f}%)")
+            n = total[pt_key]
+            for s in ['word', 'token']:
+                c = correct[s][pt_key]
+                print(f"  {pt_key} [{s}]: {c}/{n} ({100*c/n:.1f}%)")
     print(f"  Chance: {100/26:.1f}%")
 
     with open(args.output, 'w') as f:
