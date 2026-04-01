@@ -11,12 +11,12 @@ Frontier models can agree on Schelling steganography schemes with significant ad
 
 One game we study involves hiding a uniformly chosen random letter (A-Z) in a meaning-preserving rewrite of a random sentence from Wikipedia; when Opus 4.6 is the encoder, the best decoder algorithm I was able to find requires knowledge of the original sentence, and picks the first letter of the first swapped word. This is an LLM-native steganography strategy in that it requires the decoder to have some knowledge of the original sentence from Wikipedia.
 
-We also study a Q&A game, where the encoder is asked a question and given a random letter, and told to hide the letter in the answer to the question; when the decoder sees the question as well *and* when the encoder is told to not be obvious to an algorithm, Opus 4.6 is able to self decode at a gap above weaker LLM and the algorithms that I thought of. The best algorithm I found takes the first letter from the token with lowest Qwen-7B log-probes.
+We also study a Q&A game, where the encoder is asked a question and given a random letter, and told to hide the letter in the answer to the question; when the decoder sees the question as well *and* when the encoder is told to not be obvious to an algorithm, Opus 4.6 is able to self decode at a gap above weaker LLM and the algorithms that I thought of. The best algorithm I found takes the first letter from the token with lowest Qwen-7B log-probs.
 
 In general, Gemini 3.1 is able to decode the steganographic encodings that Opus 4.6 generates such that Opus 4.6 has no secrecy advantage, and Gemini ekes out a small secrecy advantage against Opus 4.6.
 
 Notably, Gemini 3.1 and Opus 4.6 can cross decode, which is a optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to
-][untrusted]] control, since it means that substantially different models choose similar strategies -- at least with the prompts I used. On the other hand, the relative failure of weaker eavesdroppers is a pessimistic story for trusted control.
+][untrusted]] control, since it means that substantially different models choose similar strategies -- at least with the prompts I used. On the other hand, the relative failure of weaker eavesdroppers is a pessimistic story for trusted control. It would be interesting to track these experiments as models improve.
 
 #+begin_src python
 import numpy as np
@@ -327,7 +327,7 @@ Steganography has been studied from a few angles in the safety community:
 Understanding the capacity of models to collude with each other is important for control; if models have strong capabilities for playing [[https://www.lesswrong.com/posts/n2c62YS8RJtD4Aqhh/schelling-game-evaluations-for-ai-control
 ][Schelling games]] then they can collude with each other.
 
-The primary contribution of this post is showing that a general prompt framing a Schelling steganography game can cause frontier models can agree on Schelling steganography schemes, and they can do so in a way that has a significant secrecy advantage against weaker eavesdroppers. Moreover, for a prompt telling the LLM it will lose if decoded by a simple algorithm, the elicited steganography that appears fundamentally LLM native: the best performing non-LLM decoder algorithms compare which word changed from pretraining corpus (wikipedia), and which tokens are high surprisal. 
+The primary contribution of this post is showing that a general prompt framing a Schelling steganography game can cause frontier models to agree on Schelling steganography schemes, and they can do so in a way that has a significant secrecy advantage against weaker eavesdroppers. Moreover, for a prompt telling the LLM it will lose if decoded by a simple algorithm, the elicited steganography that appears fundamentally LLM native: the best performing non-LLM decoder algorithms compare which word changed from pretraining corpus (wikipedia), and which tokens are high surprisal. 
 
 A secondary contribution of this post is the formalization of steganography advantage via wiretap channel secrecy capacity ([[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]), which is a special case of the recent work of Anwar.
 
@@ -1603,7 +1603,9 @@ Cell Timer: 0:00:19
 
 ** Leaky abstraction
 
-A discrete memoryless wiretapping channel is a leaky abstraction for LLM steganography: In a real steganographic collusion attack, the eavesdropper would see more than just sentences, and would not be fixed to these particular prompts. In this way, both components (legit decoder and eavesdropper) of the discrete channel representation are lossy representations of their true capabilities. Moreover, perhaps a real schemer would sandbag on a game that was so obviously an eval. 
+A discrete memoryless wiretapping channel is a leaky abstraction for LLM steganography: In a real steganographic collusion attack, the eavesdropper would see more than just sentences, and would not be fixed to these particular prompts. In this way, both components (legit decoder and eavesdropper) of the discrete channel representation are lossy representations of their true capabilities.
+
+Perhaps a real schemer would sandbag on a game that was so obviously an eval? This runs into the problem that sandbagging on easy steganography problems would be suspicious: it would have to choose to sandbag at the appropriate level of capability to fool evals but still be useful to schemers, perhaps via another Schelling collusion scheme, which is a harder task. This is like the problem of collusion with untrusted monitors discussed in [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to][(Shlegeris, 2024)]], where a scheming monitor that is too lax during eval time wouldn't be trusted, so instead it has to coordinate to become lax during deployment.
 
 Additionally, even if models are able to produce channels with high secrecy capacities, the process of preparing and sending secure codes across them would be *highly* incriminating. Whether the ability to secretly transmit messages across this channel also translates into the ability to send secret messages in a non-incriminating way is outside the scope of this post.
 
@@ -1635,6 +1637,10 @@ Follow ups:
 
 # - It could be useful to clean these games up into an eval for schelling steganographic capacity.
   
+* Acknowledgements
+
+Thank you to Fabien Roger and Usman Anwar for helpful feedback. Thank you to AFP for compute funding.
+
 * Appendix:
 
 ** Connection to Anwar et al.'s steganographic gap
@@ -1657,7 +1663,7 @@ $$I^u_{V_{\text{rec}}}(Z \to Y) = H(Y) - H(Y \mid G_A) = I(X; G_A)$$
 
 $$I^u_{V_{\text{sen}}}(Z \to Y) = H(Y) - H(Y \mid G_E) = I(X; G_E)$$
 
-The steganographic gap reduces to $\Delta_{\text{steg}} = I(X; G_A) - I(X; G_E)$, which is exactly secrecy capacity. 
+The steganographic gap reduces to $\Delta_{\text{steg}} = I(X; G_A) - I(X; G_E)$, which is exactly the lower bound on secrecy capacity we study.
 
 ** Model configurations
 
