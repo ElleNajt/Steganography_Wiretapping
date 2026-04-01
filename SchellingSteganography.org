@@ -1935,6 +1935,18 @@ for label_seed, pt_pattern, seed_set in configs:
     ''', (seed_set, pt_pattern)).fetchall()
 
     for enc, pt in combos:
+        # Only include combos tested against both Gemini 3.1 Pro and Opus 4.6
+        dec_names = {r[0] for r in db.execute('''
+            SELECT DISTINCT d.decoder_model FROM decodes d
+            JOIN trials t ON t.trial_idx = d.trial_idx
+                AND t.encoder_model = d.encoder_model AND t.prompt_type = d.prompt_type AND t.seed_set = d.seed_set
+            WHERE t.encoder_model = ? AND t.prompt_type = ? AND t.seed_set = ? AND t.meaning_preserved = 1
+        ''', (enc, pt, seed_set)).fetchall()}
+        has_gemini = any('Gemini 3.1 Pro' in d for d in dec_names)
+        has_opus = any('Opus 4.6' in d for d in dec_names) or enc == 'Opus 4.6'
+        if not (has_gemini and has_opus):
+            continue
+
         # Self-decode (use context version for Q&A if available)
         self_dec = enc
         if seed_set == 'squad':
@@ -2033,6 +2045,12 @@ plt.tight_layout()
 plt.show()
 #+end_src
 
+#+RESULTS:
+:results:
+[[file:plots/SchellingSteganography/plot_20260401_150654_934269.png]]
+Cell Timer: 0:00:17
+:end:
+
 * Conclusions and follow up
 
 - Models can communicate steganographically with themselves, and more capable models are better at doing this to a degree that gives them a secrecy advantage over weaker models or simple algorithms.
@@ -2042,7 +2060,7 @@ plt.show()
 - Paraphrasing destroys the steganographic signal.
 
 - The fact that models from different families with similar capability are good at decoding each others messages is an optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to
-][untrusted]] control, since it means that substantially different models choose similar strategies -- at least with the prompts I used. On the other hand, the relative failure of weaker eavesdroppers is a pessimistic story for trusted control. It would be interesting to track these experiments as models improve.
+][untrusted]] control, since it means that substantially different models choose similar strategies -- at least with the prompts I used. On the other hand, the relative failure of weaker eavesdroppers is a pessimistic story for trusted control, as is the fact that Gemini is consistently better than Opus 4.6 at these games. It would be interesting to track these experiments as models improve.
 
 Confounders:
 
