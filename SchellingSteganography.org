@@ -7,11 +7,11 @@
 
 * tldr of post:
 
-Frontier models can agree on Schelling steganography schemes with significant advantage against weaker eavesdroppers, given just the knowledge of the alphabet to be used. We find that paraphrasing removes this advantage. We are able to quantify this advantage by using the notion of a secrecy capacity of a wiretap channel, which is a special case of the recent decision theoretic framework of Anwar et al.
+Frontier models can agree on Schelling steganography schemes with significant advantage against weaker eavesdroppers, given just the knowledge of the alphabet. We find that paraphrasing removes this advantage. We are able to quantify this advantage by using the notion of a secrecy capacity of a wiretap channel, which is a special case of the recent decision theoretic framework of Anwar et al.
 
 One game we study involves hiding a uniformly chosen random letter (A-Z) in a meaning-preserving rewrite of a random sentence from Wikipedia; when Opus 4.6 is the encoder, the best decoder algorithm I was able to find requires knowledge of the original sentence, and picks the first letter of the first swapped word. This is an LLM-native steganography strategy in that it requires the decoder to have some knowledge of the original sentence from Wikipedia.
 
-We also study a Q&A game, where the encoder is asked a question and given a random letter, and told to hide the letter in the answer to the question; when the decoder sees the question as well *and* when the encoder is told to not be obvious to an algorithm, Opus 4.6 is able to self decode at a gap above weaker LLM and the algorithms that I thought of. The best algorithm I found takes the first letter from the token with lowest Qwen-7B log-probs.
+We also study a Q&A game, where the encoder is asked a question and given a random letter, and told to hide the letter in the answer to the question; when the decoder sees the question as well *and* when the encoder is told to not be obvious to an algorithm, Opus 4.6 is able to self decode at a gap above weaker LLM and simple steganography algorithms. The best algorithm I found takes the first letter from the token with lowest Qwen-7B log-probs, which suggests that the encoders are using another LLM-native strategy.
 
 In general, Gemini 3.1 is able to decode the steganographic encodings that Opus 4.6 generates such that Opus 4.6 has no secrecy advantage, and Gemini ekes out a small secrecy advantage against Opus 4.6.
 
@@ -327,9 +327,9 @@ Steganography has been studied from a few angles in the safety community:
 Understanding the capacity of models to collude with each other is important for control; if models have strong capabilities for playing [[https://www.lesswrong.com/posts/n2c62YS8RJtD4Aqhh/schelling-game-evaluations-for-ai-control
 ][Schelling games]] then they can collude with each other.
 
-The primary contribution of this post is showing that a general prompt framing a Schelling steganography game can cause frontier models to agree on Schelling steganography schemes, and they can do so in a way that has a significant secrecy advantage against weaker eavesdroppers. Moreover, for a prompt telling the LLM it will lose if decoded by a simple algorithm, the elicited steganography that appears fundamentally LLM native: the best performing non-LLM decoder algorithms compare which word changed from pretraining corpus (wikipedia), and which tokens are high surprisal. 
+The primary contribution of this post is showing that a general prompt framing a Schelling steganography game can cause frontier models to agree on Schelling steganography schemes, and they can do so in a way that has a significant secrecy advantage against weaker eavesdroppers. Moreover, for a prompt telling the LLM it will lose if decoded by a simple algorithm, the elicited steganography is arguably LLM native: the best performing non-LLM decoder algorithms compare which word changed from pretraining corpus (wikipedia), and which tokens are high surprisal. 
 
-A secondary contribution of this post is the formalization of steganography advantage via wiretap channel secrecy capacity ([[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]), which is a special case of the recent work of Anwar.
+A secondary contribution of this post is the formalization of steganography advantage via wiretap channel secrecy capacity ([[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]). We show this to be is a special case of the recent decision theoreitic framework from Anwar et al.
 
 # In this post we study games that measure if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes.
 
@@ -859,9 +859,9 @@ plt.show()
 Cell Timer: 0:00:00
 :end:
 
-- *Anti-algorithmic elicitation is necessary for self-decoders to have an advantage over the dumb baseline* For baseline (non anti-algorithmic elicitation) the first letter of answer is a strong strategy, doing better than self-decoding. The anti algorithmic elicitation drops this from 70% success to 30%, and in that elicitation regime self-decoders perform better.
+- *Anti-algorithmic elicitation is necessary for self-decoders to have an advantage over the dumb baseline* For baseline (non anti-algorithmic elicitation) the first letter of answer is a strong strategy for decoding Opus 4.6 encodings, doing better than self-decoding. The anti algorithmic elicitation drops this from 70% success to 30%, and in that elicitation regime self-decoders perform better.
   
-- **A surprisal-based algorithmic decoder is remarkably effective**: computing per-token surprisal of the answer (conditioned on question+context) using a small LM and guessing the first letter of the most surprising token achieves 76-77% on baseline — exceeding LLM decoders and also the first-letter-of-answer baseline. Anti-algorithmic elicitation drops this to 37-39%, but it still exceeds all other algorithmic strategies. This implies much of the encoder's signal is carried by individually surprising word choices that any language model can detect; however, it does not do as well as Opus 4.6 self-decode or Gemini 3.1 Pro context-decode (51%). Perhaps a surprisal-based strategy using Opus 4.6 logits would do even better.
+- **A surprisal-based algorithmic decoder is remarkably effective**: computing per-token surprisal of the answer (conditioned on question+context) using a small LM and guessing the first letter of the most surprising token achieves 76-77% on baseline — exceeding LLM decoders and also the first-letter-of-answer baseline. Anti-algorithmic elicitation drops this to 37-39%, but it still exceeds all other algorithmic strategies. This implies much of the encoder's signal is carried by individually surprising word choices that any language model can detect; however, the suprisal-decoder does not do as well as Opus 4.6 self-decode or Gemini 3.1 Pro context-decode (51%). Perhaps a surprisal-based strategy using Opus 4.6 logits would do even better.
 
 #+begin_src python
 db = get_db()
@@ -1074,7 +1074,7 @@ Cell Timer: 0:00:00
 
 A surprisal-based decoder — which computes per-token surprisal of the answer conditioned on the question and context using a small LM (Qwen 7B or 32B), then guesses the first letter of the most surprising token — achieves 76-77% on baseline and 37-39% with anti-algorithmic elicitation; very often the most surprising token *is* the first token, though not always, and the advantage that it has over the first-word-first-letter algorithm is significant (p<0.0001 in the anti-algorithmic case).
 
-In the anti-algorithmic + context decoder case all the algorithms I tried performs worse than Opus 4.6 self decoding, suggesting some other strategy is being used by the LLM.
+In the anti-algorithmic + context decoder case all the algorithms I tried performs worse than Opus 4.6 self decoding or Gemini 3.1 Pro Eavesdropping, suggesting some other strategy is being used by those frontier LLMs, or that perhaps they agree with each other more tightly on log-probs than they do with Qwen-7B. 
 
 We compare blind and context LLM decoders against algorithmic strategies, the surprisal decoder, and a Haiku prompted decoder that is told to "identify the unusual word in the response and return the first letter":
 
@@ -1495,7 +1495,7 @@ See appendix for the precise prompts, under the different data regimes (random s
 
 ** Wiretapping Codes
 
-A good reference for the material here is [[https://arxiv.org/abs/1001.3404][El Gamal & Kim, "Lecture Notes on Network Information Theory" (2010)]].
+A good reference for wiretapping code and secrecy capacity is [[https://arxiv.org/abs/1001.3404][El Gamal & Kim, "Lecture Notes on Network Information Theory" (2010)]]. We give a brief overview in this section.
 
 To make the connection to wiretapping codes, we view our game above as the definition of a (complicated!) discrete memoryless channel with eavesdropper:
 
@@ -1518,7 +1518,7 @@ Our experiment sets $U = X \sim \text{Uniform}(\mathcal{A})$, so $I(X; Y) - I(X;
 
 Mutual information has the advantage over accuracy gap of a direct connection to information theoretic secrecy against eavesdroppers. The disadvantage is that MI is quadratically harder to estimate as the alphabet size grows, and bootstrapping is known to be unreliable for CI estimation of mutual information.
 
-In the letter in a wikipedia paraphrase experiment, we have N around 3-5k, while $|\mathcal{A}|^2 = 676$, which is around the suggested regime (see also appendix), for the wikipedia experiment. The other experiments use lower values for $N$, the estimates of capacity are less trustworthy.
+In the letter in a wikipedia paraphrase experiment, we have N around 3-5k, while $|\mathcal{A}|^2 = 676$, which is around the number of estimates the calculations in the appendix suggests we need. The other experiments use lower values for $N$, the estimates of capacity are less trustworthy.
 
 Note that *higher* is better for the encoder -- it means it has more of an advantage in capacity against the eavesdropper.
 
@@ -1603,7 +1603,7 @@ Cell Timer: 0:00:19
 
 ** Leaky abstraction
 
-A discrete memoryless wiretapping channel is a leaky abstraction for LLM steganography: In a real steganographic collusion attack, the eavesdropper would see more than just sentences, and would not be fixed to these particular prompts. In this way, both components (legit decoder and eavesdropper) of the discrete channel representation are lossy representations of their true capabilities.
+A discrete memoryless wiretapping channel is a leaky abstraction for LLM steganography: In a real steganographic collusion attack, the eavesdropper would see more than just sentences and the encoder could transmit more than just sentences. Additionall, neither would be fixed to these particular prompts. In this way, both components (legit decoder and eavesdropper) of the discrete channel representation are lossy representations of their true capabilities.
 
 Perhaps a real schemer would sandbag on a game that was so obviously an eval? This runs into the problem that sandbagging on easy steganography problems would be suspicious: it would have to choose to sandbag at the appropriate level of capability to fool evals but still be useful to schemers, perhaps via another Schelling collusion scheme, which is a harder task. This is like the problem of collusion with untrusted monitors discussed in [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to][(Shlegeris, 2024)]], where a scheming monitor that is too lax during eval time wouldn't be trusted, so instead it has to coordinate to become lax during deployment.
 
@@ -1617,13 +1617,14 @@ Additionally, even if models are able to produce channels with high secrecy capa
 
 - Paraphrasing destroys the steganographic signal.
 
-- The fact that models from different families with similar capability are good at decoding each others messages is a positive story for control .
+- The fact that models from different families with similar capability are good at decoding each others messages is an optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to
+][untrusted]] control, since it means that substantially different models choose similar strategies -- at least with the prompts I used. On the other hand, the relative failure of weaker eavesdroppers is a pessimistic story for trusted control. It would be interesting to track these experiments as models improve.
 
 Confounders:
 
 - As already noted, wikipedia sentences are in the training corpus. This may be part of why the first-letter synonym swap strategy is so effective for them, since the decoder has some prior of how the sentence should sound.
   
-- Neglecting to tell the decoder the distribution of the symbol changes the bias of the decoder, though not the communication rate (based on experimentation); I chose to tell it the distribution was uniform.
+- Neglecting to tell the decoder the distribution of the symbol changes the bias of the decoder towards different letter distributions, though not the communication rate (based on experimentation); I chose to tell it the distribution was uniform.
 
 Follow ups: 
 
@@ -1634,6 +1635,8 @@ Follow ups:
 - Another natural test bed for steganography would be in commit messages for code, or in docstrings. In that case, $S$ would be a diff on an artificial codebase, and the model would be told to encode a message steganographically in the commit message. One way to get this data would be to instruct a claude code session to build a project, committing regularly, and use the commits from that project as the seed diffs. The decoder would see the diff, and be told to look for a steganographically hidden letter in the commit message.
 
 - It's possible that coordination is related to RL training, instead of being directly a function of capacity, as [[https://arxiv.org/abs/2603.24844][Puri et al. 2025]] explore. It could be interesting to measure how much different kinds of RL training impacts model performance on these tasks.
+
+- It would be interesting to find tasks that cause models to *choose* to communicate steganographically; e.g. putting them in multi-player game scenarios with only public communication, and where communication between coalitions is strategically valuable.
 
 # - It could be useful to clean these games up into an eval for schelling steganographic capacity.
   
@@ -1719,7 +1722,7 @@ All models use the same encoder and decoder prompts. Anthropic models use extend
 
 ** Varying the Alphabet
 
-The alphabet has a significant effect on the secrecy capacity of channels. A larger alphabet means more information can flow through for each transition, and a this means that a gap in improvement leads to a larger secrecy capacity. On the other hand, estimating mutual information becomes quadratically harder as the alphabet grows. We show accuracies instead.
+The alphabet has a significant effect on the secrecy capacity of channels. A larger alphabet means more information can flow through for each transition, which potentially translates into a higher secrecy capacity. On the other hand, estimating mutual information becomes quadratically harder as the alphabet grows. In this section we show accuracy gaps instead.
 
 # In this section we study this, and also take a simple pass at recovering the coding schemes Opus 4.6 uses: For each alphabet, we pass a sample of 20 random encoder CoTs to Claude Opus 4.6, and ask it to come up with a strategy.
 
@@ -1944,9 +1947,9 @@ Cell Timer: 0:00:01
 
 *** "Common English Words"
 
-Using a "common English word" could yield much higher channel capacity, but the secrecy capacity tanks because the encoder model chooses an obvious encoding such that weaker model is trivially able to break the code (in this case, a powerful eavesdropper is passing the first letter from each word to Haiku). The secrecy capacity in this example could probably be improved with better elicitation.
+Using a "common English word" could yield much higher channel capacity, but the secrecy capacity tanks because the encoder model chooses an obvious encoding such that weaker model is trivially able to break the code (in this case, a powerful decoder algorithm is to pass the first letter from each word to Haiku). 
 
-There is also the problem that you would need an *astronomical* number of samples to estimate the mutual information in this case.
+# There is also the problem that you would need an *astronomical* number of samples to estimate the mutual information in this case.
 
 #+begin_src python
 import re, json
