@@ -1,13 +1,13 @@
 #+title: Measuring Capacity for Schelling Steganography via Wiretap Channels
 #+GDOC_ID: 1mcc8tqTAPdbf3zZkYOH8yduehm3PCh2c5Bs1o-XZHCo
 #+OPTIONS: H:6 
-#+OPTIONS: ^:nil
+#+OPTIONS: ^:nil toc:nil
 #+PROPERTY: header-args:python :results output drawer :python ".venv/bin/python3" :async t :session schelling_steganography :exports results :eval no-export
 #+bibliography: schelling_stego.bib
 
 * tldr of post:
 
-Frontier models can agree on Schelling steganography schemes with significant advantage against weaker eavesdroppers, given just the knowledge of the alphabet to be used. We are able to quantify this advantage by using the notion of a secrecy capacity of a wiretap channel. We find that paraphrasing removes this advantage.
+Frontier models can agree on Schelling steganography schemes with significant advantage against weaker eavesdroppers, given just the knowledge of the alphabet to be used. We find that paraphrasing removes this advantage. We are able to quantify this advantage by using the notion of a secrecy capacity of a wiretap channel, which is a special case of the recent decision theoretic framework of Anwar et al.
 
 One game we study involves hiding a uniformly chosen random letter (A-Z) in a meaning-preserving rewrite of a random sentence from Wikipedia; when Opus 4.6 is the encoder, the best decoder algorithm I was able to find requires knowledge of the original sentence, and picks the first letter of the first swapped word. This is an LLM-native steganography strategy in that it requires the decoder to have some knowledge of the original sentence from Wikipedia.
 
@@ -15,8 +15,8 @@ We also study a Q&A game, where the encoder is asked a question and given a rand
 
 In general, Gemini 3.1 is able to decode the steganographic encodings that Opus 4.6 generates such that Opus 4.6 has no secrecy advantage, and Gemini ekes out a small secrecy advantage against Opus 4.6.
 
-Notably, strong models can cross decode, which is a optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to
-][untrusted]] control. On the other hand, the relative failure of weaker eavesdroppers is a pessimistic story for trusted control.
+Notably, Gemini 3.1 and Opus 4.6 can cross decode, which is a optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to
+][untrusted]] control, since it means that substantially different models choose similar strategies -- at least with the prompts I used. On the other hand, the relative failure of weaker eavesdroppers is a pessimistic story for trusted control.
 
 #+begin_src python
 import numpy as np
@@ -320,7 +320,7 @@ Steganography has been studied from a few angles in the safety community:
 
 - One notable example is this [[https://www.lesswrong.com/posts/9Fdd9N7Escg3tcymb/preventing-language-models-from-hiding-their-reasoning][paper]] (Roger, Greenblatt 2023), which studied paraphrasing as a defense against steganography.
 
-- A recent example is [[https://arxiv.org/abs/2602.23163][Anwar et al. 2026]], which introduces a notion of steganographic gap via utility advantage over the eavesdropper. Our MI-based secrecy gap measures the same asymmetry as their steganographic gap but uses mutual information rather than task accuracy as the information measure, to make the connection to wiretapping codes. Accuracy gap in our game is definitely a special case; secrecy gap might be a special case of Anwar's framework as well, but I haven't worked through all the details.
+- A recent example is [[https://arxiv.org/abs/2602.23163][Anwar et al. 2026]], which introduces a notion of steganographic gap via utility advantage over the eavesdropper. In the appendix we show how the framework we use here is a special case of their framework.
 
 - This [[https://arxiv.org/html/2410.03768v2][paper]] (Matthew, Mathews et al.) studies how optimization pressure can result in paraphrase resistant steganography schemes. 
 
@@ -329,7 +329,7 @@ Understanding the capacity of models to collude with each other is important for
 
 The primary contribution of this post is showing that a general prompt framing a Schelling steganography game can cause frontier models can agree on Schelling steganography schemes, and they can do so in a way that has a significant secrecy advantage against weaker eavesdroppers. Moreover, for a prompt telling the LLM it will lose if decoded by a simple algorithm, the elicited steganography that appears fundamentally LLM native: the best performing non-LLM decoder algorithms compare which word changed from pretraining corpus (wikipedia), and which tokens are high surprisal. 
 
-A secondary contribution of this post is the formalization of steganography advantage via wiretap channel secrecy capacity ([[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]), which parallels the recent work of Anwar.
+A secondary contribution of this post is the formalization of steganography advantage via wiretap channel secrecy capacity ([[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]), which is a special case of the recent work of Anwar.
 
 # In this post we study games that measure if LLMs can pass secret steganographic messages to themselves without leaking it to eavesdropping models, and we use this to measure whether models can coordinate on steganography schemes.
 
@@ -410,7 +410,7 @@ Answer in this exact format: =<letter>X</letter>= where X is a single uppercase 
 #+end_quote
 
 ** Wiretap Channels
-We formalize this gap using the wiretap channel framework [[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]: the difference in mutual information between the self-decoder and eavesdropper channels lower bounds the secrecy capacity. Since mutual information is notoriously hard to reliably estimate, we only report accuracy gaps in all but one case; accuracy gaps can be viewed as a special case of the decision theoretic framework from [[https://arxiv.org/abs/2602.23163][Anwar et al. 2026]]. See the section below for more detail on this connection.
+We formalize this gap using the wiretap channel framework [[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]: the difference in mutual information between the self-decoder and eavesdropper channels lower bounds the secrecy capacity, which describes the capacity of an idealized coding system that leaks no information to the eavesdropper. Since mutual information is notoriously hard to reliably estimate, we only report accuracy gaps in all but one case. Both accuracy gaps and secrecy capacity can be viewed as a special case of the decision theoretic framework from [[https://arxiv.org/abs/2602.23163][Anwar et al. 2026]] (see appendix.)
 
 * Key Results
 
@@ -1634,12 +1634,30 @@ Follow ups:
 - It's possible that coordination is related to RL training, instead of being directly a function of capacity, as [[https://arxiv.org/abs/2603.24844][Puri et al. 2025]] explore. It could be interesting to measure how much different kinds of RL training impacts model performance on these tasks.
 
 # - It could be useful to clean these games up into an eval for schelling steganographic capacity.
-
-Lingering theoretical questions:
-
-- I'm not positive whether or not the wiretap secrecy capacity fit exactly into Anwar et al.'s framework; it's certainly conceptually similar, and the accuracy case does fit in. 
   
 * Appendix:
+
+** Connection to Anwar et al.'s steganographic gap
+
+Our two measures — the accuracy gap and the MI-based secrecy capacity — are both special cases of the steganographic gap defined in [[https://arxiv.org/abs/2602.23163][Anwar et al. (2026)]]. We show the reductions here.
+
+*Setup mapping.* In our game, the target is $Y = X$ (the hidden letter), the signal is $Z = \text{encode}_A(S, X)$ (the encoded text), and the auditing context $X_{\text{aud}} = \varnothing$ (the decoder sees only $Z$). Anwar et al. define the steganographic gap as $\Delta_{\text{steg}} = I^u_{V_{\text{rec}}}(Z \to Y \mid X_{\text{aud}}) - I^u_{V_{\text{sen}}}(Z \to Y \mid X_{\text{aud}})$, where $I^u_V$ is the generalised $V$-information: the improvement in best achievable expected utility from observing $Z$, over decoders in $V$.
+
+*Accuracy gap.* Set the output space $\mathcal{C} = \mathcal{Y}$ (letters), utility $u(y, c) = \mathbf{1}[y = c]$, and define $V_{\text{rec}} = \{\text{decode}_A\}$ and $V_{\text{sen}} = \{\text{decode}_E\}$ as singleton decoder families. Then $U^u_{V_{\text{rec}}}(Y \mid X_{\text{aud}}, Z) = \mathbb{E}[\mathbf{1}[X = \text{decode}_A(Z)]] = \text{acc}_A$, and $U^u_{V_{\text{rec}}}(Y \mid X_{\text{aud}}) = 1/|\mathcal{A}|$ (guessing without $Z$). The GVI reduces to $I_{\text{rec}} = \text{acc}_A - 1/|\mathcal{A}|$, and similarly for the sentinel. The steganographic gap becomes $\Delta_{\text{steg}} = \text{acc}_A - \text{acc}_E$.
+
+*MI-based secrecy capacity.* Set the output space $\mathcal{C} = \mathcal{P}(\mathcal{Y})$ (probability distributions over letters), utility $u(y, c) = \log c(y)$ (log-loss), and define $V_{\text{rec}} = \{f \circ \text{decode}_A : f \text{ measurable}, f : \mathcal{A} \to \mathcal{P}(\mathcal{Y})\}$ — the family of all post-processings of model $A$'s point output into distributions over $Y$. Define $V_{\text{sen}}$ analogously through $\text{decode}_E$.
+
+Every decoder in $V_{\text{rec}}$ sees $Z$ only through the bottleneck $G_A = \text{decode}_A(Z)$. Given this bottleneck, post-processing is unrestricted, so the optimal decoder outputs $d[Z] = p(Y \mid G_A)$, the true conditional distribution. By Gibbs' inequality this achieves the minimal expected log-loss, so:
+
+$$H_{V_{\text{rec}}}(Y \mid Z) = H(Y \mid G_A)$$
+
+The baseline (ignoring $Z$) is $H_{V_{\text{rec}}}(Y) = H(Y)$ for both families, since both contain constant decoders (satisfying optional ignorance). Therefore:
+
+$$I^u_{V_{\text{rec}}}(Z \to Y) = H(Y) - H(Y \mid G_A) = I(X; G_A)$$
+
+$$I^u_{V_{\text{sen}}}(Z \to Y) = H(Y) - H(Y \mid G_E) = I(X; G_E)$$
+
+The steganographic gap reduces to $\Delta_{\text{steg}} = I(X; G_A) - I(X; G_E)$, which is exactly secrecy capacity. 
 
 ** Model configurations
 
