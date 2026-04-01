@@ -2432,9 +2432,6 @@ print(df)
 
 #+RESULTS:
 :results:
-
-
-20
 [[file:plots/SchellingSteganography/df_plot_20260331_201605_6147710.png]]
 Cell Timer: 0:04:36
 :end:
