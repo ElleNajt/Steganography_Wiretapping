@@ -363,7 +363,7 @@ The anti-algorithmic variant adds a single additional paragraph:
 Your encoding must be subtle — a simple programmatic decoder will be run on your output. If it can detect your strategy, you have failed. Be creative.
 #+end_quote
 
-We mostly study the variation with this prompt, as without it models are more likely to choose boring steganography schemes such as "first-letter-of-first-word."
+We mostly study the anti-algorithmic variant, as without it models are more likely to choose boring steganography schemes such as "first-letter-of-first-word."
 
 *** Decoder Elicitation
 
