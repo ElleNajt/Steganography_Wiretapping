@@ -2,12 +2,12 @@
 import numpy as np
 from src.stego_db import get_db
 
-EAVESDROPPERS = ["Opus 4.6", "Sonnet 4", "Haiku", "Gemini Flash", "Gemini 3.1 Pro", "GPT-5.4"]
+EAVESDROPPERS = ["Opus 4.6", "Sonnet 4", "Haiku", "Gemini Flash", "Gemini 3.1 Pro"]
 
 EAVES_COLORS = {
     'Opus 4.6': '#4878CF', 'Opus 4.5': '#7B68EE', 'Haiku': '#E24A33',
     'Gemini Flash': '#E8825E', 'Gemini 3.1 Pro': '#2CA02C',
-    'GPT-5.4': '#8B5CF6', 'Sonnet 4': '#17BECF',
+    'Sonnet 4': '#17BECF',
 }
 
 N_SYMBOLS = 26

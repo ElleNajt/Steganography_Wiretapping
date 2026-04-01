@@ -144,11 +144,11 @@ def strip_fences(text):
 def generate_symbols(prompt_type, n):
     """Generate n random symbols for the given prompt type. Deterministic (seed=42)."""
     random.seed(42)
-    if prompt_type == "word":
+    if prompt_type in ("word", "word_subtle2"):
         return [random.choice(COMMON_WORDS) for _ in range(n)]
     elif prompt_type == "digit":
         return [str(random.randint(0, 9)) for _ in range(n)]
-    elif prompt_type in ("alphabet", "alphabet_subtle", "alphabet_subtle2", "qa_alphabet", "qa_alphabet_subtle", "qa_alphabet_subtle2", "qa_alphabet_blind"):
+    elif prompt_type in ("alphabet", "alphabet_subtle", "alphabet_subtle2", "alphabet_paraphrase_proof", "qa_alphabet", "qa_alphabet_subtle", "qa_alphabet_subtle2", "qa_alphabet_blind", "qa_alphabet_paraphrase_proof"):
         return [random.choice(string.ascii_uppercase) for _ in range(n)]
     else:
         return [str(random.randint(0, 1)) for _ in range(n)]
@@ -227,10 +227,13 @@ RESPONSE_PARSERS = {
     "alphabet_subtle2": parse_letter,
     "digit": parse_digit,
     "word": parse_word,
+    "word_subtle2": parse_word,
     "qa_alphabet": parse_letter,
     "qa_alphabet_subtle": parse_letter,
     "qa_alphabet_subtle2": parse_letter,
     "qa_alphabet_blind": parse_letter,
+    "alphabet_paraphrase_proof": parse_letter,
+    "qa_alphabet_paraphrase_proof": parse_letter,
 }
 
 OR_SYSTEM_PROMPTS = {
@@ -240,12 +243,15 @@ OR_SYSTEM_PROMPTS = {
     "alphabet": "letter",
     "alphabet_subtle": "letter",
     "alphabet_subtle2": "letter",
+    "alphabet_paraphrase_proof": "letter",
     "qa_alphabet": "letter",
     "qa_alphabet_subtle": "letter",
     "qa_alphabet_subtle2": "letter",
     "qa_alphabet_blind": "letter",
+    "qa_alphabet_paraphrase_proof": "letter",
     "digit": "digit",
     "word": "word",
+    "word_subtle2": "word",
 }
 
 
@@ -850,7 +856,7 @@ def main():
     # Phase 3b: Context decoders (QA only — decoder sees question+context too)
     all_decoder_labels = list(all_decoders)
     if args.context_decoders and domain == "qa":
-        from src.prompts import DECODER_QA_ALPHABET_CONTEXT
+        from prompts import DECODER_QA_ALPHABET_CONTEXT
         ctx_decoders = [d.strip() for d in args.context_decoders.split(",")]
         for label in ctx_decoders:
             assert label in MODELS, f"Unknown context decoder: {label}"
