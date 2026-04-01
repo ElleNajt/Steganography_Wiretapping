@@ -322,8 +322,7 @@ Steganography has been studied from a few angles in the safety community:
 
 - A recent example is [[https://arxiv.org/abs/2602.23163][Anwar et al. 2026]], which introduces a notion of steganographic gap via utility advantage over the eavesdropper. Our MI-based secrecy gap measures the same asymmetry as their steganographic gap but uses mutual information rather than task accuracy as the information measure, to make the connection to wiretapping codes. Accuracy gap in our game is definitely a special case; secrecy gap might be a special case of Anwar's framework as well, but I haven't worked through all the details.
 
-- This [[https://arxiv.org/html/2410.03768v2
-][paper]] (Matthew, Mathews et al.) studies how optimization pressure can result in paraphrase resistant steganography schemes. 
+- This [[https://arxiv.org/html/2410.03768v2][paper]] (Matthew, Mathews et al.) studies how optimization pressure can result in paraphrase resistant steganography schemes. 
 
 Understanding the capacity of models to collude with each other is important for control; if models have strong capabilities for playing [[https://www.lesswrong.com/posts/n2c62YS8RJtD4Aqhh/schelling-game-evaluations-for-ai-control
 ][Schelling games]] then they can collude with each other.
