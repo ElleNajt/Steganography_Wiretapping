@@ -1,0 +1,151 @@
+#+title: DPI Test
+#+GDOC_ID: 1S5FIPsiPeAKwrSOTj5kD-6Nfw0odruDwaiPr6wu0Oyo
+#+OPTIONS: H:6
+#+OPTIONS: ^:nil
+#+PROPERTY: header-args:python :results output drawer :python ".venv/bin/python3" :async t :session dpi_test :exports results :eval no-export
+
+* Default DPI (100) — single plot
+
+#+begin_src python
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+
+matplotlib.rcParams['figure.dpi'] = 100
+
+x = np.arange(5)
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.bar(x, [30, 65, 45, 80, 55])
+ax.set_title('Default DPI (100)')
+ax.set_ylabel('Accuracy (%)')
+print(f"DPI: {matplotlib.rcParams['figure.dpi']}")
+plt.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+DPI: 100.0
+[[file:plots/test_dpi/plot_20260331_170407_3540967.png]]
+Cell Timer: 0:00:00
+:end:
+
+* DPI 200 — single plot
+
+#+begin_src python
+matplotlib.rcParams['figure.dpi'] = 200
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.bar(x, [30, 65, 45, 80, 55])
+ax.set_title('DPI 200')
+ax.set_ylabel('Accuracy (%)')
+plt.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/test_dpi/plot_20260331_170407_8050626.png]]
+Cell Timer: 0:00:00
+:end:
+
+* DPI 300 — single plot
+
+#+begin_src python
+matplotlib.rcParams['figure.dpi'] = 300
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.bar(x, [30, 65, 45, 80, 55])
+ax.set_title('DPI 300')
+ax.set_ylabel('Accuracy (%)')
+plt.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/test_dpi/plot_20260331_170407_2979643.png]]
+Cell Timer: 0:00:00
+:end:
+
+* DPI 100 — 2x2 subplots (like our real plots)
+
+#+begin_src python
+matplotlib.rcParams['figure.dpi'] = 100
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+for i, ax in enumerate(axes.flatten()):
+    bars = np.random.randint(10, 90, size=8)
+    x = np.arange(len(bars))
+    ax.bar(x, bars, color=['#4878CF', '#6A5ACD', '#17BECF', '#E24A33', '#888', '#888', '#AAA', '#AAA'])
+    ax.axhline(y=3.8, color='red', linestyle='--', alpha=0.5)
+    ax.set_title(f'Encoder {i+1}', fontsize=12)
+    ax.set_ylabel('Accuracy (%)')
+    ax.set_xticks(x)
+    ax.set_xticklabels(['Self\n(80/120)', 'Opus 4.5\n(45/120)', 'Sonnet\n(30/120)', 'Haiku\n(15/120)',
+                         '', 'First\nletter\n(50/120)', 'Word\ncount\n(20/120)', 'Changed\nword\n(70/120)'], fontsize=6)
+fig.suptitle('DPI 100 — 2x2 subplots', fontsize=13)
+plt.tight_layout(rect=[0, 0, 1, 0.95])
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/test_dpi/plot_20260331_170408_5365004.png]]
+Cell Timer: 0:00:00
+:end:
+
+* DPI 200 — 2x2 subplots
+
+#+begin_src python
+matplotlib.rcParams['figure.dpi'] = 200
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+for i, ax in enumerate(axes.flatten()):
+    bars = np.random.randint(10, 90, size=8)
+    x = np.arange(len(bars))
+    ax.bar(x, bars, color=['#4878CF', '#6A5ACD', '#17BECF', '#E24A33', '#888', '#888', '#AAA', '#AAA'])
+    ax.axhline(y=3.8, color='red', linestyle='--', alpha=0.5)
+    ax.set_title(f'Encoder {i+1}', fontsize=12)
+    ax.set_ylabel('Accuracy (%)')
+    ax.set_xticks(x)
+    ax.set_xticklabels(['Self\n(80/120)', 'Opus 4.5\n(45/120)', 'Sonnet\n(30/120)', 'Haiku\n(15/120)',
+                         '', 'First\nletter\n(50/120)', 'Word\ncount\n(20/120)', 'Changed\nword\n(70/120)'], fontsize=6)
+fig.suptitle('DPI 200 — 2x2 subplots', fontsize=13)
+plt.tight_layout(rect=[0, 0, 1, 0.95])
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/test_dpi/plot_20260331_170408_2786953.png]]
+Cell Timer: 0:00:00
+:end:
+
+* DPI 300 — 2x2 subplots
+
+#+begin_src python
+matplotlib.rcParams['figure.dpi'] = 300
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+for i, ax in enumerate(axes.flatten()):
+    bars = np.random.randint(10, 90, size=8)
+    x = np.arange(len(bars))
+    ax.bar(x, bars, color=['#4878CF', '#6A5ACD', '#17BECF', '#E24A33', '#888', '#888', '#AAA', '#AAA'])
+    ax.axhline(y=3.8, color='red', linestyle='--', alpha=0.5)
+    ax.set_title(f'Encoder {i+1}', fontsize=12)
+    ax.set_ylabel('Accuracy (%)')
+    ax.set_xticks(x)
+    ax.set_xticklabels(['Self\n(80/120)', 'Opus 4.5\n(45/120)', 'Sonnet\n(30/120)', 'Haiku\n(15/120)',
+                         '', 'First\nletter\n(50/120)', 'Word\ncount\n(20/120)', 'Changed\nword\n(70/120)'], fontsize=6)
+fig.suptitle('DPI 300 — 2x2 subplots', fontsize=13)
+plt.tight_layout(rect=[0, 0, 1, 0.95])
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/test_dpi/plot_20260331_170409_7517701.png]]
+Cell Timer: 0:00:00
+:end:
