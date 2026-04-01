@@ -2357,7 +2357,7 @@ Cell Timer: 0:00:24
 
 We check whether 95% percentile bootstrap CIs on the secrecy delta actually achieve 95% coverage. We simulate channels with known true secrecy, draw N samples (matching our experimental sample size), compute bootstrap CIs, and check how often they contain the true value.
 
-#+begin_src python :dataframe_image yes
+#+begin_src python 
 rng = np.random.default_rng(42)
 K = 26
 
@@ -2417,22 +2417,44 @@ for p_self, p_eaves, label in scenarios:
             lo, hi = bootstrap_ci(symbols, self_dec, eaves_dec)
             if lo <= true_delta <= hi:
                 covers += 1
-        rows.append({
-            "Scenario": label,
-            "True Δ": f"{true_delta:.2f}",
-            "N": n,
-            "Coverage": f"{covers}/{n_trials}",
-        })
+                rows.append({
+                    "Scenario": label,
+                    "True Δ": f"{true_delta:.2f}",
+                    "N": n,
+                    "Coverage": f"{covers}/{n_trials}",
+                })
 
  
+        
 df = pd.DataFrame(rows)
-print(df)
+print(df.set_index("Scenario"))
 #+end_src
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/df_plot_20260331_201605_6147710.png]]
-Cell Timer: 0:04:36
+| Scenario                  | True Δ |    N | Coverage |
+|---------------------------+--------+------+----------|
+| Self~chance, eaves~chance |   0.33 |  500 | 116/200  |
+| Self~chance, eaves~chance |   0.33 | 1000 | 181/200  |
+| Self~chance, eaves~chance |   0.33 | 2000 | 190/200  |
+| Self~chance, eaves~chance |   0.33 | 4400 | 192/200  |
+| Self=40%, eaves~chance    |   1.02 |  500 | 17/200   |
+| Self=40%, eaves~chance    |   1.02 | 1000 | 119/200  |
+| Self=40%, eaves~chance    |   1.02 | 2000 | 188/200  |
+| Self=40%, eaves~chance    |   1.02 | 4400 | 188/200  |
+| Self=65%, eaves~chance    |   2.20 |  500 | 0/200    |
+| Self=65%, eaves~chance    |   2.20 | 1000 | 11/200   |
+| Self=65%, eaves~chance    |   2.20 | 2000 | 173/200  |
+| Self=65%, eaves~chance    |   2.20 | 4400 | 186/200  |
+| Self=65%, eaves=30%       |   1.55 |  500 | 4/200    |
+| Self=65%, eaves=30%       |   1.55 | 1000 | 68/200   |
+| Self=65%, eaves=30%       |   1.55 | 2000 | 166/200  |
+| Self=65%, eaves=30%       |   1.55 | 4400 | 192/200  |
+| Self=65%, eaves=55%       |   0.51 |  500 | 145/200  |
+| Self=65%, eaves=55%       |   0.51 | 1000 | 168/200  |
+| Self=65%, eaves=55%       |   0.51 | 2000 | 187/200  |
+| Self=65%, eaves=55%       |   0.51 | 4400 | 187/200  |
+Cell Timer: 0:00:00
 :end:
 
 ** Prompts
