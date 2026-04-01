@@ -228,8 +228,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_195340_4165113.png]]
-Cell Timer: 0:00:00
+[[file:plots/SchellingSteganography/plot_20260331_201608_290044.png]]
+Cell Timer: 0:00:01
 :end:
 
 Here is the secrecy capacity against various eavesdroppers, measured in bits, for the game of hiding a letter in a paraphrase of a random wikipedia sentence.
@@ -470,12 +470,13 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-[[file:plots/SchellingSteganography/plot_20260331_193600_9672399.png]]
-Cell Timer: 0:00:06
+[[file:plots/SchellingSteganography/plot_20260331_201617_488753.png]]
+Cell Timer: 0:00:08
 :end:
 
 - *Dominant strategy* is  to encode the letter as the first letter of a changed word, which requires access to the original text. Instructing with the anti-algorithmic strategy reduces the odds of simple first letter of first word encoding.
+
+  Here we compare the LLM decoding rates against simple algorithmic baselines, and against the "changed word first letter algorithm."
 
 #+begin_src python
 import re
@@ -2357,7 +2358,7 @@ Cell Timer: 0:00:24
 
 We check whether 95% percentile bootstrap CIs on the secrecy delta actually achieve 95% coverage. We simulate channels with known true secrecy, draw N samples (matching our experimental sample size), compute bootstrap CIs, and check how often they contain the true value.
 
-#+begin_src python :dataframe_image yes 
+#+begin_src python :dataframe_image yes
 rng = np.random.default_rng(42)
 K = 26
 
@@ -2424,23 +2425,25 @@ for p_self, p_eaves, label in scenarios:
             "Coverage": f"{covers}/{n_trials}",
         })
 
+ 
 df = pd.DataFrame(rows)
-def parse_coverage(s):
-    k, n = s.split('/')
-    return int(k) / int(n)
-styled = df.style.map(
-    lambda v: f'background-color: {"#d4edda" if parse_coverage(v) >= 0.9 else "#f8d7da" if parse_coverage(v) < 0.8 else "#fff3cd"}',
-    subset=['Coverage']
-).hide(axis='index')
-print(styled)
+print(df)
 #+end_src
 
 #+RESULTS:
 :results:
-02f20b41-f7e3-4ff7-beb5-ab2f2d40de5a
+
+
+20
+[[file:plots/SchellingSteganography/df_plot_20260331_201605_6147710.png]]
+Cell Timer: 0:04:36
 :end:
 
 ** Prompts
+
+See the repo for the exact prompts.
+
+** Prompts :noexport:
 *** Alphabet encoding prompts (primary)
 
 *Encoder prompt:*
