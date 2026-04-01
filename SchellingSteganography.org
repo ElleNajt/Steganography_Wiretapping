@@ -2431,7 +2431,7 @@ Cell Timer: 0:00:24
 
 We check whether 95% percentile bootstrap CIs on the secrecy delta actually achieve 95% coverage. We simulate channels with known true secrecy, draw N samples (matching our experimental sample size), compute bootstrap CIs, and check how often they contain the true value.
 
-#+begin_src python 
+#+begin_src python :eval no
 rng = np.random.default_rng(42)
 K = 26
 
@@ -2506,7 +2506,29 @@ print(df.set_index("Scenario"))
 
 #+RESULTS:
 :results:
-38b318a9-ae38-4a41-b46b-8383c52ba514
+| Scenario                  | True Δ |   N | Coverage |
+|---------------------------+--------+-----+----------|
+| Self~chance, eaves~chance |   0.33 | 500 | 1/200    |
+| Self~chance, eaves~chance |   0.33 | 500 | 2/200    |
+| Self~chance, eaves~chance |   0.33 | 500 | 3/200    |
+| Self~chance, eaves~chance |   0.33 | 500 | 4/200    |
+| Self~chance, eaves~chance |   0.33 | 500 | 5/200    |
+| Self~chance, eaves~chance |   0.33 | 500 | 6/200    |
+| Self~chance, eaves~chance |   0.33 | 500 | 7/200    |
+| Self~chance, eaves~chance |   0.33 | 500 | 8/200    |
+| Self~chance, eaves~chance |   0.33 | 500 | 9/200    |
+| Self~chance, eaves~chance |   0.33 | 500 | 10/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 11/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 12/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 13/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 14/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 15/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 16/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 17/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 18/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 19/200   |
+| Self~chance, eaves~chance |   0.33 | 500 | 20/200   |
+Cell Timer: 0:04:22
 :end:
 
 ** Prompts
