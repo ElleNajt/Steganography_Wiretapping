@@ -1692,7 +1692,7 @@ By Gibbs' inequality, $q = P(Y \mid G_A)$ achieves the supremum for each value o
 
 $$= \mathbb{E}_{G_A}\Big[\mathbb{E}_{Y \mid G_A}\big[\log P(Y \mid G_A)\big]\Big] = -H(Y \mid G_A) \qquad \square$$
 
-The baseline (ignoring $Z$) is $-H(Y)$ for both families (constant decoders satisfy optional ignorance). Therefore:
+Both families include the trivial decoder that always outputs $P(Y)$ regardless of $Z$, so $U^u_V(Y \mid X_{\text{aud}}) = -H(Y)$ by the same Gibbs argument. Therefore:
 
 $$I^u_{V_{\text{rec}}}(Z \to Y) = H(Y) - H(Y \mid G_A) = I(X; G_A)$$
 
