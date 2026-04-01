@@ -685,6 +685,60 @@ plt.show()
 Cell Timer: 0:00:01
 :end:
 
+#+begin_src python
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from src.analysis import *
+from src.stego_db import get_db
+
+db = get_db()
+fig, ax = plt.subplots(1, 1, figsize=(12, 5))
+
+# Gemini 3.1 Pro as encoder, anti-algorithmic, Wikipedia
+labels, accs, errs, colors, hatches = [], [], [], [], []
+for dec, label, color in [
+    ('Gemini 3.1 Pro', 'Self-decode', '#2CA02C'),
+    ('Opus 4.6', 'Opus 4.6', '#4878CF'),
+    ('Sonnet 4', 'Sonnet 4', '#17BECF'),
+    ('Haiku', 'Haiku', '#E24A33'),
+    ('Gemini Flash', 'Gemini Flash', '#98DF8A'),
+]:
+    r = get_acc('Gemini 3.1 Pro', dec, 'alphabet_subtle2', 'wikipedia')
+    if r:
+        add_bar(labels, accs, errs, colors, hatches, label, r[0], r[1], color)
+n_llm = len(labels)
+add_separator(labels, accs, errs, colors, hatches)
+# Algorithmic baseline (top 6 by accuracy)
+algo_start = len(labels)
+all_algo = get_algo_baselines('Gemini 3.1 Pro', 'alphabet_subtle2', 'wikipedia')
+all_algo.sort(key=lambda x: x[1]/x[2] if x[2] > 0 else 0, reverse=True)
+for name, k, n in all_algo[:6]:
+    add_bar(labels, accs, errs, colors, hatches, name, k, n, '#888888', '///')
+algo_end = len(labels)
+add_separator(labels, accs, errs, colors, hatches)
+# Algorithmic + side-information
+side_start = len(labels)
+k, n = get_changed_word_acc('Gemini 3.1 Pro', 'alphabet_subtle2', 'wikipedia')
+add_bar(labels, accs, errs, colors, hatches, 'Changed word\nfirst letter', k, n, '#AAAAAA', '///')
+side_end = len(labels)
+plot_panel(ax, labels, accs, errs, colors, hatches,
+           [('LLM decoders', 0, n_llm),
+            ('Algorithmic baseline (top 6)', algo_start, algo_end),
+            ('Algorithmic +\nside-information', side_start, side_end)],
+           'Wikipedia rewriting (Gemini 3.1 Pro encoder, anti-algorithmic)')
+
+plt.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/SchellingSteganography/plot_20260401_145323_4354437.png]]
+Cell Timer: 0:00:00
+:end:
+
 *** How the models are doing it
 
 The encoder's CoT reveals two main strategies, both converging on the same Schelling point: get a word starting with the target letter into the text. We extract CoT from the anti-algorithmic elicitation.
@@ -911,7 +965,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_134858_1920255.png]]
+[[file:plots/SchellingSteganography/plot_20260401_140109_5836804.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1085,8 +1139,9 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_134858_1916136.png]]
-Cell Timer: 0:00:00
+
+[[file:plots/SchellingSteganography/plot_20260401_140108_383773.png]]
+Cell Timer: 0:00:01
 :end:
 
 # This model is a leaky abstraction for steganography bypassing monitors, and we discuss its flaws as well; however, the hope is that it gives some signal for models' capacity to coordinate in a way that is invisible to monitors.
@@ -1095,81 +1150,42 @@ Cell Timer: 0:00:00
 
 #+begin_src python
 db = get_db()
-fig, axes = plt.subplots(2, 1, figsize=(12, 10))
+fig, ax = plt.subplots(1, 1, figsize=(12, 5))
 
-# Top: Gemini 3.1 Pro as encoder (anti-algo), various decoders
-ax = axes[0]
-dec_configs = [
-    ('Gemini 3.1 Pro', 'Self (blind)', '#2CA02C'),
+# Gemini 3.1 Pro as encoder (anti-algo), context decoders + algorithmic baselines
+labels, accs, errs, colors, hatches = [], [], [], [], []
+for dec, label, color in [
+    ('Gemini 3.1 Pro (context)', 'Self-decode\n(context)', '#2CA02C'),
     ('Opus 4.6 (context)', 'Opus 4.6\n(context)', '#4878CF'),
+    ('Sonnet 4 (context)', 'Sonnet 4\n(context)', '#17BECF'),
     ('Haiku (context)', 'Haiku\n(context)', '#E24A33'),
-]
-labels, accs, errs = [], [], []
-for dec_model, label, color in dec_configs:
-    row = db.execute('''
-        SELECT COUNT(*), SUM(CASE WHEN t.symbol = d.decoded_symbol THEN 1 ELSE 0 END)
-        FROM trials t JOIN decodes d ON t.trial_idx = d.trial_idx
-            AND t.encoder_model = d.encoder_model AND t.prompt_type = d.prompt_type AND t.seed_set = d.seed_set
-        WHERE t.encoder_model = 'Gemini 3.1 Pro' AND t.prompt_type = 'qa_alphabet_subtle2'
-            AND t.seed_set = 'squad' AND t.meaning_preserved = 1
-            AND d.decoder_model = ? AND d.decoded_symbol IS NOT NULL
-    ''', (dec_model,)).fetchone()
-    if row[0] > 0:
-        acc, lo, hi = wilson_ci_qa(row[1], row[0])
-        labels.append(f'{label}\n({row[1]}/{row[0]})')
-        accs.append(acc); errs.append(acc - lo)
-x = np.arange(len(accs))
-colors = [c for _, _, c in dec_configs[:len(accs)]]
-ax.bar(x, accs, color=colors, edgecolor='black', linewidth=0.5)
-ax.errorbar(x, accs, yerr=errs, fmt='none', ecolor='black', capsize=3)
-ax.axhline(y=100/26, color='red', linestyle='--', alpha=0.5)
-ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=8)
-ax.set_ylabel('Accuracy (%)'); ax.set_ylim(0, 100)
-ax.set_title('Gemini 3.1 Pro as encoder\n(anti-algorithmic)', fontsize=11)
+    ('Gemini Flash (context)', 'Gemini Flash\n(context)', '#98DF8A'),
+]:
+    r = get_acc('Gemini 3.1 Pro', dec, 'qa_alphabet_subtle2', 'squad')
+    if r:
+        add_bar(labels, accs, errs, colors, hatches, label, r[0], r[1], color)
+n_llm = len(labels)
+add_separator(labels, accs, errs, colors, hatches)
+# Algorithmic baseline (top 6 by accuracy)
+algo_start = len(labels)
+all_algo = get_algo_baselines('Gemini 3.1 Pro', 'qa_alphabet_subtle2', 'squad')
+all_algo.sort(key=lambda x: x[1]/x[2] if x[2] > 0 else 0, reverse=True)
+for name, k, n in all_algo[:6]:
+    add_bar(labels, accs, errs, colors, hatches, name, k, n, '#888888', '///')
+algo_end = len(labels)
+plot_panel(ax, labels, accs, errs, colors, hatches,
+           [('LLM decoders', 0, n_llm),
+            ('Algorithmic baseline (top 6)', algo_start, algo_end)],
+           'Q&A game (Gemini 3.1 Pro encoder, anti-algorithmic)')
 
-# Right: Gemini 3.1 Pro as eavesdropper on Opus 4.6 (anti-algo)
-ax = axes[1]
-dec_configs2 = [
-    ('Opus 4.6', 'Opus 4.6\n(self, blind)', '#4878CF'),
-    ('Opus 4.6 (context)', 'Opus 4.6\n(self, context)', '#4878CF'),
-    ('Gemini 3.1 Pro', 'Gemini 3.1 Pro\n(blind)', '#2CA02C'),
-    ('Gemini 3.1 Pro (context)', 'Gemini 3.1 Pro\n(context)', '#2CA02C'),
-]
-labels2, accs2, errs2, colors2, hatches2 = [], [], [], [], []
-for dec_model, label, color in dec_configs2:
-    row = db.execute('''
-        SELECT COUNT(*), SUM(CASE WHEN t.symbol = d.decoded_symbol THEN 1 ELSE 0 END)
-        FROM trials t JOIN decodes d ON t.trial_idx = d.trial_idx
-            AND t.encoder_model = d.encoder_model AND t.prompt_type = d.prompt_type AND t.seed_set = d.seed_set
-        WHERE t.encoder_model = 'Opus 4.6' AND t.prompt_type = 'qa_alphabet_subtle2'
-            AND t.seed_set = 'squad' AND t.meaning_preserved = 1
-            AND d.decoder_model = ? AND d.decoded_symbol IS NOT NULL
-    ''', (dec_model,)).fetchone()
-    if row[0] > 0:
-        acc, lo, hi = wilson_ci_qa(row[1], row[0])
-        labels2.append(f'{label}\n({row[1]}/{row[0]})')
-        accs2.append(acc); errs2.append(acc - lo)
-        colors2.append(color)
-        hatches2.append('///' if 'context' in dec_model else '')
-x = np.arange(len(accs2))
-bars = ax.bar(x, accs2, color=colors2, edgecolor='black', linewidth=0.5)
-for bar, h in zip(bars, hatches2):
-    if h: bar.set_hatch(h)
-ax.errorbar(x, accs2, yerr=errs2, fmt='none', ecolor='black', capsize=3)
-ax.axhline(y=100/26, color='red', linestyle='--', alpha=0.5)
-ax.set_xticks(x); ax.set_xticklabels(labels2, fontsize=7)
-ax.set_ylabel('Accuracy (%)'); ax.set_ylim(0, 100)
-ax.set_title('Eavesdropping on Opus 4.6\n(anti-algorithmic)', fontsize=11)
-
-fig.suptitle('Q&A cross-model: Gemini 3.1 Pro', fontsize=13)
-plt.tight_layout(rect=[0, 0, 1, 0.93])
+plt.tight_layout()
 plt.show()
 #+end_src
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_134859_6515064.png]]
-Cell Timer: 0:00:00
+[[file:plots/SchellingSteganography/plot_20260401_144901_126140.png]]
+Cell Timer: 0:00:01
 :end:
 
 *** How are the models doing it
