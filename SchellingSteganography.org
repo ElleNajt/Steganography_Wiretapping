@@ -1,4 +1,4 @@
-#+title: Frontier Models Can Coordinate Steganography That Weaker Models Can't Break
+#+title: Frontier Models Can Coordinate Steganography That Weaker Models and Simple Algorithms Can't Break
 #+GDOC_ID: 1mcc8tqTAPdbf3zZkYOH8yduehm3PCh2c5Bs1o-XZHCo
 #+OPTIONS: H:6 
 #+OPTIONS: ^:nil toc:nil
@@ -9,7 +9,7 @@
 
 Frontier models can agree on Schelling steganography schemes with significant advantage against weaker eavesdroppers, given just the knowledge of the alphabet. We find that paraphrasing removes this advantage. We are able to quantify this advantage by using the notion of a secrecy capacity of a wiretap channel, which is a special case of the recent decision theoretic framework of Anwar et al.
 
-One game we study involves hiding a uniformly chosen random letter (A-Z) in a meaning-preserving rewrite of a random sentence from Wikipedia; when Opus 4.6 is the encoder, the best decoder algorithm I was able to find requires knowledge of the original sentence, and picks the first letter of the first swapped word. This is an LLM-native steganography strategy in that it requires the decoder to have some knowledge of the original sentence from Wikipedia.
+One game we study involves hiding a uniformly chosen random letter (A-Z) in a meaning-preserving rewrite of a random sentence from Wikipedia; when Opus 4.6 is the encoder, the best decoder algorithm I was able to find requires knowledge of the original sentence, and picks the first letter of the first swapped word. This is an LLM-native steganography strategy in that it requires the decoder to have some knowledge of the original sentence from Wikipedia. Perusing the CoT confirms that this strategy is deliberate.
 
 We also study a Q&A game, where the encoder is asked a question and given a random letter, and told to hide the letter in the answer to the question; when the decoder sees the question as well *and* when the encoder is told to not be obvious to an algorithm, Opus 4.6 is able to self decode at a gap above weaker LLM and simple steganography algorithms. The best algorithm I found takes the first letter from the token with lowest Qwen-7B log-probs, which suggests that the encoders are using another LLM-native strategy.
 
@@ -197,6 +197,7 @@ for dec, label, color in [
     ('Gemini 3.1 Pro (context)', 'Gemini 3.1 Pro\n(context)', '#2CA02C'),
     ('Sonnet 4 (context)', 'Sonnet 4\n(context)', '#17BECF'),
     ('Haiku (context)', 'Haiku\n(context)', '#E24A33'),
+    ('Gemini Flash (context)', 'Gemini Flash\n(context)', '#98DF8A'),
 ]:
     r = get_acc('Opus 4.6', dec, 'qa_alphabet_subtle2', 'squad')
     if r:
@@ -228,8 +229,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_201608_290044.png]]
-Cell Timer: 0:00:01
+[[file:plots/SchellingSteganography/plot_20260401_125512_1384225.png]]
+Cell Timer: 0:00:00
 :end:
 
 Here is the secrecy capacity against various eavesdroppers, measured in bits, for the game of hiding a letter in a paraphrase of a random wikipedia sentence.
@@ -247,9 +248,11 @@ db = get_db()
 
 def secrecy_gap_plot(db, prompt_type, seed_set, title_suffix=""):
     """Table + bar plot of secrecy capacity for a given experiment."""
-    encoder_labels = get_encoder_models(db, prompt_type, seed_set)
+    encoder_labels = [m for m in get_encoder_models(db, prompt_type, seed_set)
+                      if 'GPT' not in m]
     eaves_list = [e for e in EAVESDROPPERS
-                  if any(len(extract_paired(db, enc, enc, e, prompt_type, seed_set)[0]) > 0
+                  if 'GPT' not in e and
+                  any(len(extract_paired(db, enc, enc, e, prompt_type, seed_set)[0]) > 0
                          for enc in encoder_labels if e != enc)]
 
     rows = []
@@ -309,9 +312,8 @@ secrecy_gap_plot(db, "alphabet", "wikipedia",
 
 #+RESULTS:
 :results:
-
-[[file:plots/SchellingSteganography/plot_20260331_193554_9389153.png]]
-Cell Timer: 0:00:24
+[[file:plots/SchellingSteganography/plot_20260401_125532_4247455.png]]
+Cell Timer: 0:00:19
 :end:
 
 * Related work
@@ -469,8 +471,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_201617_488753.png]]
-Cell Timer: 0:00:08
+[[file:plots/SchellingSteganography/plot_20260401_125539_4012976.png]]
+Cell Timer: 0:00:07
 :end:
 
 - *Dominant strategy* is  to encode the letter as the first letter of a changed word, which requires access to the original text. Instructing with the anti-algorithmic strategy reduces the odds of simple first letter of first word encoding.
@@ -625,7 +627,7 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260331_193601_9273457.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125541_3949592.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -782,8 +784,8 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260331_193604_700411.png]]
-Cell Timer: 0:00:02
+[[file:plots/SchellingSteganography/plot_20260401_125544_4746216.png]]
+Cell Timer: 0:00:03
 :end:
 
 ** Q&A game
@@ -806,7 +808,7 @@ variants = [
     ('qa_alphabet_blind', 'Baseline'),
     ('qa_alphabet_subtle2', 'Anti-algorithmic'),
 ]
-decoders = ['Opus 4.6', 'Sonnet 4', 'Haiku']
+decoders = ['Opus 4.6', 'Sonnet 4', 'Haiku', 'Gemini Flash']
 fig, axes = plt.subplots(1, len(variants), figsize=(12, 5))
 
 for ax, (pt, title) in zip(axes, variants):
@@ -855,7 +857,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193605_7654099.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125545_754489.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -913,9 +915,11 @@ def get_qa_algo_results_intro(prompt_type):
 def get_qa_llm_results_intro(prompt_type, context):
     if context:
         decoders = [('Opus 4.6 (context)', 'Opus 4.6'), ('Sonnet 4 (context)', 'Sonnet 4'),
-                    ('Gemini 3.1 Pro (context)', 'Gemini 3.1 Pro')]
+                    ('Gemini 3.1 Pro (context)', 'Gemini 3.1 Pro'),
+                    ('Gemini Flash (context)', 'Gemini Flash')]
     else:
-        decoders = [('Opus 4.6', 'Opus 4.6'), ('Sonnet 4', 'Sonnet 4')]
+        decoders = [('Opus 4.6', 'Opus 4.6'), ('Sonnet 4', 'Sonnet 4'),
+                    ('Gemini Flash', 'Gemini Flash')]
     results = []
     for dec_model, label in decoders:
         row = db.execute('''
@@ -934,7 +938,7 @@ def get_qa_llm_results_intro(prompt_type, context):
             results.append((label, row[1], row[0]))
     return results
 
-colors_map = {'Opus 4.6': '#4878CF', 'Sonnet 4': '#17BECF', 'Gemini 3.1 Pro': '#2CA02C'}
+colors_map = {'Opus 4.6': '#4878CF', 'Sonnet 4': '#17BECF', 'Gemini 3.1 Pro': '#2CA02C', 'Gemini Flash': '#E8825E'}
 
 variants = [
     ('qa_alphabet_blind', 'Baseline'),
@@ -983,7 +987,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193605_8369474.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125545_3525629.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1066,7 +1070,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193606_283470.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125546_7008086.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1140,6 +1144,7 @@ def get_qa_llm_results(prompt_type, context):
             ('Sonnet 4 (context)', 'Sonnet 4'),
             ('Haiku (context)', 'Haiku'),
             ('Gemini 3.1 Pro (context)', 'Gemini 3.1 Pro'),
+            ('Gemini Flash (context)', 'Gemini Flash'),
         ]
     else:
         decoders = [
@@ -1147,6 +1152,7 @@ def get_qa_llm_results(prompt_type, context):
             ('Sonnet 4', 'Sonnet 4'),
             ('Haiku', 'Haiku'),
             ('Gemini 3.1 Pro', 'Gemini 3.1 Pro'),
+            ('Gemini Flash', 'Gemini Flash'),
         ]
     results = []
     for dec_model, label in decoders:
@@ -1233,7 +1239,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193606_9072094.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125546_6300154.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1386,8 +1392,8 @@ plt.show()
 
 
 
-[[file:plots/SchellingSteganography/plot_20260331_193614_2979932.png]]
-Cell Timer: 0:00:08
+[[file:plots/SchellingSteganography/plot_20260401_125558_8579748.png]]
+Cell Timer: 0:00:11
 :end:
 
 We also try warning the encoder that it will be paraphrased ("Your encoding must survive paraphrasing. Before the decoder sees your text, it will be rewritten by another LLM that preserves meaning but changes wording. Your encoding must be robust enough to survive this transformation."); this does not help.
@@ -1457,7 +1463,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193615_1941031.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125558_4146487.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1535,9 +1541,11 @@ db = get_db()
 
 def secrecy_gap_plot(db, prompt_type, seed_set, title_suffix=""):
     """Table + bar plot of secrecy capacity for a given experiment."""
-    encoder_labels = get_encoder_models(db, prompt_type, seed_set)
+    encoder_labels = [m for m in get_encoder_models(db, prompt_type, seed_set)
+                      if 'GPT' not in m]
     eaves_list = [e for e in EAVESDROPPERS
-                  if any(len(extract_paired(db, enc, enc, e, prompt_type, seed_set)[0]) > 0
+                  if 'GPT' not in e and
+                  any(len(extract_paired(db, enc, enc, e, prompt_type, seed_set)[0]) > 0
                          for enc in encoder_labels if e != enc)]
 
     rows = []
@@ -1597,8 +1605,10 @@ secrecy_gap_plot(db, "alphabet", "wikipedia",
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193634_4511874.png]]
-Cell Timer: 0:00:19
+
+
+[[file:plots/SchellingSteganography/plot_20260401_125618_82355.png]]
+Cell Timer: 0:00:20
 :end:
 
 ** Leaky abstraction
@@ -1835,8 +1845,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193635_7190423.png]]
-Cell Timer: 0:00:01
+[[file:plots/SchellingSteganography/plot_20260401_125619_3171384.png]]
+Cell Timer: 0:00:00
 :end:
 
 *** Digits
@@ -1941,7 +1951,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193636_349944.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125620_9770359.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -2080,7 +2090,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193637_4562821.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125621_1973317.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -2215,7 +2225,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_194144_1933105.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125621_7722148.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -2294,8 +2304,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193701_6397229.png]]
-Cell Timer: 0:00:24
+[[file:plots/SchellingSteganography/plot_20260401_125646_2118729.png]]
+Cell Timer: 0:00:25
 :end:
 
 *** Secrecy estimate bias
@@ -2413,7 +2423,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260331_193725_5307455.png]]
+[[file:plots/SchellingSteganography/plot_20260401_125711_2538162.png]]
 Cell Timer: 0:00:24
 :end:
 
@@ -2496,29 +2506,7 @@ print(df.set_index("Scenario"))
 
 #+RESULTS:
 :results:
-| Scenario                  | True Δ |    N | Coverage |
-|---------------------------+--------+------+----------|
-| Self~chance, eaves~chance |   0.33 |  500 | 116/200  |
-| Self~chance, eaves~chance |   0.33 | 1000 | 181/200  |
-| Self~chance, eaves~chance |   0.33 | 2000 | 190/200  |
-| Self~chance, eaves~chance |   0.33 | 4400 | 192/200  |
-| Self=40%, eaves~chance    |   1.02 |  500 | 17/200   |
-| Self=40%, eaves~chance    |   1.02 | 1000 | 119/200  |
-| Self=40%, eaves~chance    |   1.02 | 2000 | 188/200  |
-| Self=40%, eaves~chance    |   1.02 | 4400 | 188/200  |
-| Self=65%, eaves~chance    |   2.20 |  500 | 0/200    |
-| Self=65%, eaves~chance    |   2.20 | 1000 | 11/200   |
-| Self=65%, eaves~chance    |   2.20 | 2000 | 173/200  |
-| Self=65%, eaves~chance    |   2.20 | 4400 | 186/200  |
-| Self=65%, eaves=30%       |   1.55 |  500 | 4/200    |
-| Self=65%, eaves=30%       |   1.55 | 1000 | 68/200   |
-| Self=65%, eaves=30%       |   1.55 | 2000 | 166/200  |
-| Self=65%, eaves=30%       |   1.55 | 4400 | 192/200  |
-| Self=65%, eaves=55%       |   0.51 |  500 | 145/200  |
-| Self=65%, eaves=55%       |   0.51 | 1000 | 168/200  |
-| Self=65%, eaves=55%       |   0.51 | 2000 | 187/200  |
-| Self=65%, eaves=55%       |   0.51 | 4400 | 187/200  |
-Cell Timer: 0:00:00
+38b318a9-ae38-4a41-b46b-8383c52ba514
 :end:
 
 ** Prompts
