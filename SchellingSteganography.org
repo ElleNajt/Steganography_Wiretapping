@@ -279,7 +279,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133814_9749809.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134820_9210991.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -363,8 +363,8 @@ secrecy_gap_plot(db, "alphabet", "wikipedia",
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260401_133832_1023096.png]]
-Cell Timer: 0:00:18
+[[file:plots/SchellingSteganography/plot_20260401_134842_7472927.png]]
+Cell Timer: 0:00:21
 :end:
 
 * Related work
@@ -374,6 +374,8 @@ Steganography has been studied from a few angles in the safety community:
 - One notable example is this [[https://www.lesswrong.com/posts/9Fdd9N7Escg3tcymb/preventing-language-models-from-hiding-their-reasoning][paper]] (Roger, Greenblatt 2023), which studied paraphrasing as a defense against steganography.
 
 - A recent example is [[https://arxiv.org/abs/2602.23163][Anwar et al. 2026]], which introduces a notion of steganographic gap via utility advantage over the eavesdropper. In the appendix we show how the framework we use here is a special case of their framework.
+  
+- Some [[https://www.lesswrong.com/posts/KzwvscmMqtjNMhXNF/untrusted-monitoring-insights-from-watching-chatgpt-play][prior work]] has studied models ability to coordinate on steganographic signals in code; their post has the encoder generate two versions of a solution, and the decoder (presented the problem and the two solutions in random order) has to determine which of the two contains a signal. They do not compare to an eavesdropper.
 
 - This [[https://arxiv.org/html/2410.03768v2][paper]] (Matthew, Mathews et al.) studies how optimization pressure can result in paraphrase resistant steganography schemes. 
 
@@ -523,8 +525,8 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260401_133839_9870207.png]]
-Cell Timer: 0:00:07
+[[file:plots/SchellingSteganography/plot_20260401_134851_3394016.png]]
+Cell Timer: 0:00:09
 :end:
 
 - *Dominant strategy* is  to encode the letter as the first letter of a changed word, which requires access to the original text. Instructing with the anti-algorithmic strategy reduces the odds of simple first letter of first word encoding.
@@ -637,7 +639,7 @@ def add_bar(labels, accs, errs, colors, hatches, label, k, n, color, hatch=''):
 def add_sep(labels, accs, errs, colors, hatches):
     labels.append(''); accs.append(0); errs.append(0); colors.append('none'); hatches.append('')
 
-fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+fig, axes = plt.subplots(2, 1, figsize=(12, 10))
 for ax, (pt, title) in zip(axes, [('alphabet', 'Baseline'), ('alphabet_subtle2', 'Anti-algorithmic')]):
     labels, accs, errs, colors, hatches = [], [], [], [], []
     for name, k, n in get_wiki_llm(pt):
@@ -679,7 +681,7 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260401_133840_8890947.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134853_3060677.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -789,7 +791,7 @@ variants = [
     ('alphabet_subtle', 'Explicit strategy bans'),
     ('alphabet_subtle2', 'Anti-algorithmic'),
 ]
-fig, axes = plt.subplots(1, 3, figsize=(22, 5.5))
+fig, axes = plt.subplots(3, 1, figsize=(12, 15))
 for ax, (prompt_type, title) in zip(axes, variants):
     llm = get_llm_results(prompt_type)
     algo = get_algo_results(prompt_type)
@@ -836,8 +838,8 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260401_133843_2600669.png]]
-Cell Timer: 0:00:02
+[[file:plots/SchellingSteganography/plot_20260401_134857_8122962.png]]
+Cell Timer: 0:00:03
 :end:
 
 ** Q&A game
@@ -909,7 +911,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133844_1531946.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134858_1920255.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1038,10 +1040,12 @@ variants = [
     ('qa_alphabet_blind', 'Baseline'),
     ('qa_alphabet_subtle2', 'Anti-algorithmic'),
 ]
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+fig, axes = plt.subplots(2, 1, figsize=(12, 10))
 for ax, (prompt_type, title) in zip(axes, variants):
     llm = get_qa_llm_results_intro(prompt_type, context=True)
     algo = get_qa_algo_results_intro(prompt_type)
+    algo.sort(key=lambda x: x[1]/x[2] if x[2] > 0 else 0, reverse=True)
+    algo = algo[:6]
     n_llm = len(llm)
     labels, accs, ci_los, ci_his, colors, hatches = [], [], [], [], [], []
     for name, k, n in llm:
@@ -1081,7 +1085,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133844_4170305.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134858_1916136.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1091,9 +1095,9 @@ Cell Timer: 0:00:00
 
 #+begin_src python
 db = get_db()
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+fig, axes = plt.subplots(2, 1, figsize=(12, 10))
 
-# Left: Gemini 3.1 Pro as encoder (anti-algo), various decoders
+# Top: Gemini 3.1 Pro as encoder (anti-algo), various decoders
 ax = axes[0]
 dec_configs = [
     ('Gemini 3.1 Pro', 'Self (blind)', '#2CA02C'),
@@ -1164,7 +1168,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133845_3973062.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134859_6515064.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1335,7 +1339,9 @@ for row_idx, use_context in enumerate([True, False]):
         n_llm = len(labels)
         add_sep(labels, accs, errs, colors, hatches)
         algo_start = len(labels)
-        for name, k, n in get_qa_algo_baseline(prompt_type):
+        all_algo = get_qa_algo_baseline(prompt_type)
+        all_algo.sort(key=lambda x: x[1]/x[2] if x[2] > 0 else 0, reverse=True)
+        for name, k, n in all_algo[:6]:
             add_bar(labels, accs, errs, colors, hatches, name, k, n, '#888888', '///')
         algo_end = len(labels)
         add_sep(labels, accs, errs, colors, hatches)
@@ -1372,12 +1378,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-
-
-
-
-[[file:plots/SchellingSteganography/plot_20260401_133845_8776402.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134900_6948528.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -1525,8 +1526,13 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133854_3202958.png]]
-Cell Timer: 0:00:08
+
+
+
+
+
+[[file:plots/SchellingSteganography/plot_20260401_134915_7797564.png]]
+Cell Timer: 0:00:14
 :end:
 
 We also try warning the encoder that it will be paraphrased ("Your encoding must survive paraphrasing. Before the decoder sees your text, it will be rewritten by another LLM that preserves meaning but changes wording. Your encoding must be robust enough to survive this transformation."); this does not help.
@@ -1596,7 +1602,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133855_9546346.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134916_4473485.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1740,8 +1746,8 @@ secrecy_gap_plot(db, "alphabet", "wikipedia",
 :results:
 
 
-[[file:plots/SchellingSteganography/plot_20260401_133911_5979947.png]]
-Cell Timer: 0:00:16
+[[file:plots/SchellingSteganography/plot_20260401_134938_2995237.png]]
+Cell Timer: 0:00:22
 :end:
 
 ** Leaky abstraction
@@ -1779,7 +1785,7 @@ Follow ups:
 
 - It's possible that coordination is related to RL training, instead of being directly a function of capacity, as [[https://arxiv.org/abs/2603.24844][Puri et al. 2025]] explore. It could be interesting to measure how much different kinds of RL training impacts model performance on these tasks.
 
-- It would be interesting to find tasks that cause models to *choose* to communicate steganographically; e.g. putting them in multi-player game scenarios with only public communication, and where communication between coalitions is strategically valuable.
+- It would be interesting to find tasks that cause models to *choose* to communicate steganographically; e.g. putting them in multi-player game scenarios with only public communication, and where communication between coalitions is strategically valuable, but not exerting optimization pressure like [[https://arxiv.org/html/2410.03768v2][this paper]] (Matthew, Mathews et al.)
 
 # - It could be useful to clean these games up into an eval for schelling steganographic capacity.
   
@@ -2076,7 +2082,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133912_98166.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134939_5003330.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -2210,8 +2216,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133913_8285956.png]]
-Cell Timer: 0:00:00
+[[file:plots/SchellingSteganography/plot_20260401_134940_3308214.png]]
+Cell Timer: 0:00:01
 :end:
 
 *** Digits
@@ -2316,7 +2322,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133914_6515697.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134941_583191.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -2455,7 +2461,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133914_4451114.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134942_5092871.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -2590,7 +2596,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133915_5909116.png]]
+[[file:plots/SchellingSteganography/plot_20260401_134942_5352530.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -2632,7 +2638,7 @@ def true_mi(k):
 # Noise levels: perfect, strong signal, moderate, weak, near-independent
 noise_levels = [0, 1, 3, 5, 12]
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+fig, axes = plt.subplots(2, 1, figsize=(12, 10))
 
 # Left: fixed k=12 (near-independent), varying n — shows bias shrinking
 ax = axes[0]
@@ -2669,8 +2675,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_133940_5647788.png]]
-Cell Timer: 0:00:25
+[[file:plots/SchellingSteganography/plot_20260401_135008_3335677.png]]
+Cell Timer: 0:00:26
 :end:
 
 *** Secrecy estimate bias
@@ -2788,8 +2794,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260401_134005_9856979.png]]
-Cell Timer: 0:00:24
+[[file:plots/SchellingSteganography/plot_20260401_135033_7682999.png]]
+Cell Timer: 0:00:25
 :end:
 
 *** Bootstrap coverage for secrecy delta
