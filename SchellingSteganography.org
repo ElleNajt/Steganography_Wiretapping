@@ -772,7 +772,6 @@ fig, axes = plt.subplots(3, 1, figsize=(12, 15))
 for ax, (prompt_type, title) in zip(axes, variants):
     llm = get_llm_results(prompt_type)
     algo = get_algo_baselines('Opus 4.6', prompt_type, 'wikipedia')
-    algo += get_wiki_side_info(prompt_type)
     algo.sort(key=lambda x: x[1]/x[2] if x[2] > 0 else 0, reverse=True)
     algo = algo[:6]
     n_llm = len(llm)
@@ -784,11 +783,22 @@ for ax, (prompt_type, title) in zip(axes, variants):
         colors.append(colors_map.get(name, '#999')); hatches.append('')
     labels.append(''); accs.append(0); ci_los.append(0); ci_his.append(0)
     colors.append('none'); hatches.append('')
+    algo_start = len(labels)
     for name, k, n in algo:
         acc, lo, hi = wilson_ci(k, n)
         labels.append(f'{name}\n({k}/{n})')
         accs.append(acc); ci_los.append(acc - lo); ci_his.append(hi - acc)
         colors.append('#888888'); hatches.append('///')
+    algo_end = len(labels)
+    labels.append(''); accs.append(0); ci_los.append(0); ci_his.append(0)
+    colors.append('none'); hatches.append('')
+    side_start = len(labels)
+    k_cw, n_cw = get_changed_word_acc('Opus 4.6', prompt_type, 'wikipedia')
+    acc, lo, hi = wilson_ci(k_cw, n_cw)
+    labels.append(f'Changed word\nfirst letter\n({k_cw}/{n_cw})')
+    accs.append(acc); ci_los.append(acc - lo); ci_his.append(hi - acc)
+    colors.append('#AAAAAA'); hatches.append('///')
+    side_end = len(labels)
     x = np.arange(len(accs))
     bars = ax.bar(x, accs, color=colors, edgecolor='black', linewidth=0.5, width=0.7)
     for bar, h in zip(bars, hatches):
@@ -796,14 +806,16 @@ for ax, (prompt_type, title) in zip(axes, variants):
     ax.errorbar(x, accs, yerr=[ci_los, ci_his], fmt='none', ecolor='black', capsize=3, linewidth=1)
     chance = 100 / 26
     ax.axhline(y=chance, color='red', linestyle='--', alpha=0.7, linewidth=1)
-    ax.axvline(x=n_llm + 0.0, color='gray', linestyle=':', alpha=0.5)
     ax.set_ylim(0, max(accs) * 1.18)
     ylim = ax.get_ylim()[1]
-    ax.text(np.mean(range(n_llm)), ylim * 0.97, 'LLM decoders',
-            ha='center', va='top', fontsize=9, fontstyle='italic', color='#555')
-    algo_start = n_llm + 1
-    ax.text(np.mean(range(algo_start, len(accs))), ylim * 0.97, 'Algorithmic decoders',
-            ha='center', va='top', fontsize=9, fontstyle='italic', color='#555')
+    for sec_label, s, e in [('LLM decoders', 0, n_llm),
+                             ('Algorithmic baseline (top 6)', algo_start, algo_end),
+                             ('Algorithmic +\nside-information', side_start, side_end)]:
+        if e > s:
+            ax.text(np.mean(range(s, e)), ylim * 0.97, sec_label,
+                    ha='center', va='top', fontsize=8, fontstyle='italic', color='#555')
+    for sep_x in [algo_start - 0.5, side_start - 0.5]:
+        ax.axvline(x=sep_x, color='gray', linestyle=':', alpha=0.5)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, fontsize=7)
     ax.set_ylabel('Accuracy (%)')
@@ -817,11 +829,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-Traceback (most recent call last):
-File "<SchellingSteganography: org babel source block> ", line 38, in <module>
-File "<org babel source block>", line 55, in <module>
-NameError: name 'get_wiki_side_info' is not defined
-Cell Timer: 0:00:00
+[[file:plots/SchellingSteganography/plot_20260402_164340_2231306.png]]
+Cell Timer: 0:00:03
 :end:
 
 **** :noexport:
