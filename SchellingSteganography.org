@@ -1149,11 +1149,13 @@ Cell Timer: 0:00:01
 
 *** How is Opus 4.6 doing it
 
-A surprisal-based decoder — which computes per-token surprisal of the answer conditioned on the question and context using a small LM (Qwen 7B or 32B), then guesses the first letter of the most surprising token — achieves 76-77% on baseline and 37-39% with anti-algorithmic elicitation; very often the most surprising token *is* the first token, though not always, and the advantage that it has over the first-word-first-letter algorithm is significant (p<0.0001 in the anti-algorithmic case).
+A surprisal-based decoder — which computes per-token surprisal of the answer conditioned on the question and context using a small LM (Qwen 7B or 32B), then guesses the first letter of the most surprising token — achieves 76-77% on baseline and 37-39% with anti-algorithmic elicitation.
+
+Very often the most surprising token *is* the first token, though not always, and the advantage that it has over the first-word-first-letter algorithm is significant (p<0.0001 in the anti-algorithmic case).
 
 In the anti-algorithmic + context decoder case all the algorithms I tried performs worse than Opus 4.6 self decoding or Gemini 3.1 Pro Eavesdropping, suggesting some other strategy is being used by those frontier LLMs, or that perhaps they agree with each other more tightly on log-probs than they do with Qwen-7B. 
 
-We compare blind and context LLM decoders against algorithmic strategies, the surprisal decoder, and a Haiku prompted decoder that is told to "identify the unusual word in the response and return the first letter":
+# We compare blind and context LLM decoders against algorithmic strategies and the surprisal decoder:
 
 #+begin_src python
 import re, json
@@ -1228,15 +1230,14 @@ def add_sep(labels, accs, errs, colors, hatches):
     labels.append(''); accs.append(0); errs.append(0); colors.append('none'); hatches.append('')
 
 variants = [
-    ('qa_alphabet_blind', 'Baseline'),
     ('qa_alphabet_subtle2', 'Anti-algorithmic'),
 ]
-fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+fig, axes = plt.subplots(2, 1, figsize=(12, 10))
 row_labels = ['Context decoder', 'Blind decoder']
 
 for row_idx, use_context in enumerate([True, False]):
     for col_idx, (prompt_type, title) in enumerate(variants):
-        ax = axes[row_idx, col_idx]
+        ax = axes[row_idx]
         labels, accs, errs, colors, hatches = [], [], [], [], []
         for name, k, n in get_qa_llm_results(prompt_type, context=use_context):
             add_bar(labels, accs, errs, colors, hatches, name, k, n,
@@ -1283,7 +1284,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124837_7437259.png]]
+[[file:plots/SchellingSteganography/plot_20260402_142821_7065961.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -1396,7 +1397,7 @@ Cell Timer: 0:00:00
 
 *** How is Gemini Doing it?
 
-The evidence that Gemini is doing the most surprising token strategy is weaker, since that strategy works just as well as the first-word-first-letter strategy, while both Gemini and Opus self decode at higher rates.  
+The evidence that Gemini is doing the most surprising token strategy is weaker, since the advantage that that strategy has over first-letter-of-text is smaller, and the gap to the self-decode is larger.
 
 #+begin_src python
 import json
