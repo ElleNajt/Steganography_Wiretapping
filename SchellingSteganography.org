@@ -380,8 +380,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124805_1186519.png]]
-Cell Timer: 0:00:02
+[[file:plots/SchellingSteganography/plot_20260402_162426_3181433.png]]
+Cell Timer: 0:00:00
 :end:
 
 Notably, Gemini 3.1 can decode Opus 4.6's encodings better than it can, which is an optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to
@@ -443,7 +443,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124807_6023774.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162428_5257077.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -457,15 +457,16 @@ secrecy_gap_plot(db, "alphabet", "wikipedia",
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260402_124821_1655765.png]]
-Cell Timer: 0:00:14
+
+[[file:plots/SchellingSteganography/plot_20260402_162441_4743511.png]]
+Cell Timer: 0:00:12
 :end:
 
 * Related work
 
 Steganography has been studied from a few angles in the safety community:
 
-- [[https://arxiv.org/pdf/2310.18512][Roger & Greenblatt (2023)]] studied paraphrasing as a defense against LLM steganography. Their work includes a scratchpad scheme structurally similar to our Schelling game: the encoder privately devises a strategy and executes it, and the decoder independently infers what strategy was used. Using 2023-era models (GPT-3.5/GPT-4), they find that context-aware paraphrasing limits all tested schemes to roughly 3 bits per KB of text. We extend this in three directions: we repeat the experiment with current frontier models, where the pre-paraphrasing capability appears substantially stronger (Opus 4.6 achieves 2.54 bits of mutual information per trial, on single sentences averaging 145 bytes — roughly 18 bits/KB); we measure not just raw capacity but the secrecy gap against cross-model eavesdroppers (Opus 4.6 achieves a secrecy gap of 1.45 bits against Haiku, or ~10 secrecy bits/KB), which is the quantity relevant to untrusted control; and we formalize this gap via the wiretap channel framework. Our finding that paraphrasing destroys the steganographic signal — dropping Opus 4.6 self-decode from 63% to near chance — is consistent with their results.
+- [[https://arxiv.org/pdf/2310.18512][Roger & Greenblatt (2023)]] studied paraphrasing as a defense against LLM steganography. Their work includes a scratchpad scheme structurally similar to our Schelling game: the encoder privately devises a strategy and executes it, and the decoder independently infers what strategy was used. Using 2023-era models (GPT-3.5/GPT-4), they find that context-aware paraphrasing limits all tested schemes to roughly 3 bits per KB of text. We extend this in three directions: we repeat the experiment with current frontier models, where the pre-paraphrasing capability appears substantially stronger (Opus 4.6 achieves 2.12 bits of mutual information per trial, on single sentences averaging 209 bytes — roughly 10 bits/KB); we measure not just raw capacity but the secrecy gap against cross-model eavesdroppers (Opus 4.6 achieves a secrecy gap of 2.00 bits against Haiku, or ~10 secrecy bits/KB), which is the quantity relevant to untrusted control; and we formalize this gap via the wiretap channel framework. Our finding that paraphrasing destroys the steganographic signal — dropping Opus 4.6 self-decode from 63% to near chance — is consistent with their results.
 
 - A recent example is [[https://arxiv.org/abs/2602.23163][Anwar et al. 2026]], which introduces a notion of steganographic gap via utility advantage over a sentinel, which we are calling an eavesdropper because of the connection with wiretap channels. Their empirical work validates the framework using fixed steganography schemes (applying ciphers to reasoning traces, training models on codewords, and fine-tuning on cipher-encoded chains of thought); our work complements this by measuring spontaneous Schelling coordination capacity in frontier models using wiretap secrecy capacity - in the appendix we show our wiretap channel construction to be a special case of their framework.
   
@@ -619,8 +620,8 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260402_124828_1280375.png]]
-Cell Timer: 0:00:07
+[[file:plots/SchellingSteganography/plot_20260402_162447_5256285.png]]
+Cell Timer: 0:00:06
 :end:
 
 *** Cross-model decoding: Opus vs Gemini
@@ -692,7 +693,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124829_1179715.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162448_114254.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -816,10 +817,11 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-
-[[file:plots/SchellingSteganography/plot_20260402_124832_4847802.png]]
-Cell Timer: 0:00:02
+Traceback (most recent call last):
+File "<SchellingSteganography: org babel source block> ", line 38, in <module>
+File "<org babel source block>", line 55, in <module>
+NameError: name 'get_wiki_side_info' is not defined
+Cell Timer: 0:00:00
 :end:
 
 **** :noexport:
@@ -941,7 +943,11 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260402_124834_6531593.png]]
+
+
+
+
+[[file:plots/SchellingSteganography/plot_20260402_162449_9983754.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -999,7 +1005,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124834_6114713.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162450_304157.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1074,7 +1080,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124835_488056.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162451_7712128.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1144,8 +1150,7 @@ plt.show()
 
 
 
-
-[[file:plots/SchellingSteganography/plot_20260402_124836_2989994.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162452_8742562.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -1286,8 +1291,12 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_142821_7065961.png]]
-Cell Timer: 0:00:01
+Traceback (most recent call last):
+File "<SchellingSteganography: org babel source block> ", line 38, in <module>
+File "<org babel source block>", line 95, in <module>
+File "<org babel source block>", line 18, in get_qa_side_info
+NameError: name 'surprisal_by_model' is not defined
+Cell Timer: 0:00:00
 :end:
 
 **** :noexport:
@@ -1393,7 +1402,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124838_9070601.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162453_6814861.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1450,7 +1459,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124838_9586020.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162453_9922093.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1600,8 +1609,7 @@ plt.show()
 :results:
 
 
-
-[[file:plots/SchellingSteganography/plot_20260402_124847_4289849.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162502_4084685.png]]
 Cell Timer: 0:00:08
 :end:
 
@@ -1672,7 +1680,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124847_2130832.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162502_7942766.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1731,9 +1739,9 @@ Our experiment sets $U = X \sim \text{Uniform}(\mathcal{A})$, so $I(X; Y) - I(X;
 
 ** Secrecy gap
 
-Mutual information has the advantage over accuracy gap of a direct connection to information theoretic secrecy against eavesdroppers. The disadvantage is that MI is quadratically harder to estimate as the alphabet size grows, and bootstrapping is known to be unreliable for CI estimation of mutual information.
+Mutual information has the advantage over accuracy gap of a direct connection to information theoretic secrecy against eavesdroppers. The disadvantage is that MI is quadratically harder to estimate as the alphabet size grows ([[https://doi.org/10.1162/089976603321780272][Paninski 2003]]), and bootstrapping is known to be unreliable for CI estimation of mutual information.
 
-In the letter in a wikipedia paraphrase experiment, we have N around 3-5k, while $|\mathcal{A}|^2 = 676$, which is around the number of estimates the calculations in the appendix suggests we need. The Q&A experiment has much lower N (~400), so the estimates are less trustworthy.
+We apply the Miller-Madow bias correction to all MI estimates: $\hat{I}_{MM} = \hat{I}_{plugin} - \frac{m_{XY} - m_X - m_Y + 1}{2N \ln 2}$, where $m_{XY}$, $m_X$, $m_Y$ are the number of nonzero cells in the joint and marginal distributions. In the Wikipedia experiment we have $N \approx 3$--$5$k with $|\mathcal{A}|^2 = 676$ joint cells, where the correction is small ($\approx 0.08$ bits). The Q&A experiment has $N \approx 400$, where the correction is larger and the estimates less trustworthy. We report MI point estimates only, without confidence intervals to avoid giving a false sense of confidence.
 
 Note that *higher* is better for the encoder -- it means it has more of an advantage in capacity against the eavesdropper.
 
@@ -1746,7 +1754,7 @@ secrecy_gap_plot(db, "alphabet", "wikipedia",
 :results:
 
 
-[[file:plots/SchellingSteganography/plot_20260402_124900_4264954.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162515_1389116.png]]
 Cell Timer: 0:00:12
 :end:
 
@@ -1758,7 +1766,7 @@ secrecy_gap_plot(db, "qa_alphabet_subtle2", "squad",
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124901_4355774.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162516_1648709.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1924,8 +1932,8 @@ plt.show()
 :results:
 
 
-[[file:plots/SchellingSteganography/plot_20260402_124918_4300321.png]]
-Cell Timer: 0:00:17
+[[file:plots/SchellingSteganography/plot_20260402_162535_6832032.png]]
+Cell Timer: 0:00:19
 :end:
 
 * Conclusions and follow up
@@ -2243,7 +2251,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124918_3718334.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162536_5103420.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -2377,7 +2385,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124919_1821057.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162537_3257984.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -2483,8 +2491,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124920_4827630.png]]
-Cell Timer: 0:00:00
+[[file:plots/SchellingSteganography/plot_20260402_162538_8179215.png]]
+Cell Timer: 0:00:01
 :end:
 
 *** "Common English Words"
@@ -2622,7 +2630,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124921_3513227.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162538_9418043.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -2757,17 +2765,17 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124921_1074409.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162539_3743783.png]]
 Cell Timer: 0:00:00
 :end:
 
-** Note on MI estimation
+** Note on MI estimation :noexport:
 
 The plugin estimator of mutual information $I(X,Y) = H(X) + H(Y) - H(X,Y)$ is generally (but not always, not the $k = 0$ case in the below plot) biased upward: the joint entropy term $H(X,Y)$ is biased down, roughly on the order of $|\mathcal{X} \times \mathcal{Y}| / (2N \ln 2)$, and the $H(X)$ and $H(Y)$ terms are biased down on the order of $|X|/2N$ and $|Y|/2N$ respectively. Accurate MI estimation requires $N \gg |\text{alphabet}|^2$ ([[https://doi.org/10.1162/089976603321780272][Paninski 2003]]). In the regime where $N$ is smaller, bootstrap confidence intervals are unreliable, because resampling does not correct the systematic bias.
 
 # (The sharp threshold for consistent entropy estimation is $n \asymp k / \log k$ samples ([[https://doi.org/10.1109/TIT.2016.2548468][Wu & Yang 2016]]), and rate-optimal MI estimators with $n$ samples perform as the MLE with $n \log n$ samples ([[https://doi.org/10.1109/TIT.2015.2412945][Jiao et al. 2015]]).)
 
-For estimating MI in the alphabet in random wikipedia paraphrase channel, we chose $N$ empirically: the simulation below shows the plugin estimator's bias as a function of sample size for $K = 26$ categories. At our operating point of $N \approx 4400$ paired samples per encoder-decoder pair (after meaning-preservation filtering), the joint distribution has $K^2 = 676$ cells, and the expected bias is $\approx 0.08$ bits — small relative to the MI values we observe ($\sim 1$--$3$ bits for Opus 4.6). We report MI point estimates only, without confidence intervals.
+We apply the Miller-Madow bias correction to all MI estimates: $\hat{I}_{MM} = \hat{I}_{plugin} - \frac{m_{XY} - m_X - m_Y + 1}{2N \ln 2}$, where $m_{XY}$, $m_X$, $m_Y$ are the number of nonzero cells in the joint and marginal distributions. For the Wikipedia channel at our operating point of $N \approx 4400$ paired samples per encoder-decoder pair (after meaning-preservation filtering), the joint distribution has $K^2 = 676$ cells and the correction is small ($\approx 0.08$ bits). For the Q&A channel ($N \approx 400$), the correction is larger and more important. We report MI point estimates only, without confidence intervals.
 
 The following block shows the plugin MI estimator's bias on completely independent variables (true MI = 0) as a function of sample size, with K=26 categories:
 
@@ -2836,7 +2844,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_124947_2489251.png]]
+[[file:plots/SchellingSteganography/plot_20260402_162604_6633205.png]]
 Cell Timer: 0:00:25
 :end:
 
@@ -2955,11 +2963,11 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260402_125011_241620.png]]
-Cell Timer: 0:00:24
+[[file:plots/SchellingSteganography/plot_20260402_162629_5569350.png]]
+Cell Timer: 0:00:25
 :end:
 
-*** Bootstrap coverage for secrecy delta
+*** Bootstrap coverage for secrecy delta :noexport:
 
 We check whether 95% percentile bootstrap CIs on the secrecy delta actually achieve 95% coverage. We simulate channels with known true secrecy, draw N samples (matching our experimental sample size), compute bootstrap CIs, and check how often they contain the true value.
 
