@@ -5,6 +5,8 @@
 #+PROPERTY: header-args:python :results output drawer :python ".venv/bin/python3" :async t :session schelling_steganography :exports results :eval no-export
 #+bibliography: schelling_stego.bib
 
+Code and data: [[https://github.com/ElleNajt/Steganography_Wiretapping][github.com/ElleNajt/Steganography_Wiretapping]]
+
 * tldr of post:
 
 Frontier models can agree on Schelling steganography schemes with significant advantage against weaker eavesdroppers, given just the knowledge of the alphabet. We find that paraphrasing removes this advantage. We are able to quantify this advantage by using the notion of a secrecy capacity of a wiretap channel, which we show is a special case of the recent decision theoretic framework of Anwar et al.
