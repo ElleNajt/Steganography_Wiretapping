@@ -2754,6 +2754,8 @@ Claude code was used extensively for writing code and parts of this blog post.
 
 Anti-Slop Guarantee: The writing has been reviewed by the author, and many parts were written by hand. Mistakes may still lurk; feedback and corrections are welcome!
 
+To the authors knowledge, there are no hidden messages in this blog post.
+
 * Appendix:
 
 ** Connection to Anwar et al.'s steganographic gap
