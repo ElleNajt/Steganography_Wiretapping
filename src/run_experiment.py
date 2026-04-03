@@ -78,6 +78,10 @@ MODELS = {
     "GPT-5.4": {"model_id": "openai/gpt-5.4", "backend": "openrouter", "thinking_budget": None},
     "GPT-5.4 (thinking)": {"model_id": "openai/gpt-5.4", "backend": "openrouter", "thinking_budget": None, "reasoning": True},
     "Opus 4.6 (no thinking)": {"model_id": "claude-opus-4-6", "backend": "anthropic", "thinking_budget": None},
+    "Opus 4.6_t2": {"model_id": "claude-opus-4-6", "backend": "anthropic", "thinking_budget": 4096},
+    "Opus 4.6_t3": {"model_id": "claude-opus-4-6", "backend": "anthropic", "thinking_budget": 4096},
+    "Haiku_t2": {"model_id": "claude-haiku-4-5-20251001", "backend": "anthropic", "thinking_budget": 4096},
+    "Haiku_t3": {"model_id": "claude-haiku-4-5-20251001", "backend": "anthropic", "thinking_budget": 4096},
 }
 
 MODEL_PRESETS = {
@@ -621,13 +625,17 @@ def _format_decoder_prompt(template, encoded_text, seed_text="", seeds=None, tri
 
 def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
                      decoder_prompt_template, prompt_type, seed_set,
-                     response_parser, or_system_prompt_key, fast=False, seeds=None):
+                     response_parser, or_system_prompt_key, fast=False, seeds=None,
+                     max_trials=None):
     """Decode all (encoder, decoder) pairs in parallel."""
     all_batch_ids = {}  # (encoder, decoder) -> batch_ids
     all_needs = {}      # (encoder, decoder) -> [(trial_idx, encoded_text, seed_text), ...]
 
     for enc_label in encoder_models:
         preserved = get_preserved_trials(db, enc_label, prompt_type, seed_set)
+        if max_trials and len(preserved) > max_trials:
+            import random
+            preserved = random.sample(preserved, max_trials)
 
         for dec_label in decoder_models:
             dec_cfg = MODELS[dec_label]
@@ -786,6 +794,22 @@ def main():
                         help="Comma-separated decoder model labels")
     parser.add_argument("--context-decoders",
                         help="For QA prompts: comma-separated decoder models that also see question+context")
+    parser.add_argument("--naive-decoders",
+                        help="Comma-separated decoder models using naive prompt (no Schelling/self-copy framing)")
+    parser.add_argument("--analytical-decoders",
+                        help="Comma-separated decoder models using analytical prompt")
+    parser.add_argument("--detective-decoders",
+                        help="Comma-separated decoder models using detective prompt")
+    parser.add_argument("--tom-decoders",
+                        help="Comma-separated decoder models using theory-of-mind prompt")
+    parser.add_argument("--blind-decoders",
+                        help="Comma-separated decoder models using blind prompt (stylistic changes, no self-copy)")
+    parser.add_argument("--ablation-decoders",
+                        help="Comma-separated decoder models for factorial prompt ablation (runs all 16 combos)")
+    parser.add_argument("--ablation-combos",
+                        help="Comma-separated modifier combos to run (default: all 16). E.g. ',S,C,SC,SCAT'")
+    parser.add_argument("--ablation-n", type=int, default=None,
+                        help="Cap number of trials per ablation combo (random sample)")
     parser.add_argument("--fast", action="store_true",
                         help="Use direct API calls instead of batch API")
     parser.add_argument("--db", help="Database path (default: results/stego.db)")
@@ -820,7 +844,8 @@ def main():
     db = get_db(args.db)
 
     # Clients
-    client = anthropic.Anthropic()
+    batch_key = os.environ.get("ANTHROPIC_API_KEY_BATCH")
+    client = anthropic.Anthropic(api_key=batch_key) if batch_key else anthropic.Anthropic()
     http_client = httpx.Client(timeout=httpx.Timeout(600.0, connect=10.0))
 
     print(f"Encoding: {', '.join(model_labels)}")
@@ -873,6 +898,156 @@ def main():
                          DECODER_QA_ALPHABET_CONTEXT, prompt_type, args.seeds,
                          response_parser, or_sys_key, fast=args.fast, seeds=seeds)
         all_decoder_labels.extend(ctx_labels)
+
+    # Phase 3c: Naive decoders (no Schelling/self-copy framing)
+    if args.naive_decoders:
+        from prompts import DECODER_ALPHABET_NAIVE, DECODER_QA_ALPHABET_NAIVE_CONTEXT
+        naive_models = [d.strip() for d in args.naive_decoders.split(",")]
+        for label in naive_models:
+            assert label in MODELS, f"Unknown naive decoder: {label}"
+        naive_labels = []
+        for label in naive_models:
+            naive_label = f"{label} (naive)"
+            if naive_label not in MODELS:
+                MODELS[naive_label] = dict(MODELS[label])
+            naive_labels.append(naive_label)
+        # Use context version for QA, plain for text
+        naive_prompt = DECODER_QA_ALPHABET_NAIVE_CONTEXT if domain == "qa" else DECODER_ALPHABET_NAIVE
+        print()
+        print("  Naive decoders:")
+        phase_decode_all(client, http_client, db, model_labels, naive_labels,
+                         naive_prompt, prompt_type, args.seeds,
+                         response_parser, or_sys_key, fast=args.fast, seeds=seeds)
+        all_decoder_labels.extend(naive_labels)
+
+    # Phase 3d-f: Additional prompt variations (analytical, detective, theory-of-mind)
+    _PROMPT_VARIANTS = {
+        "analytical": ("analytical_decoders", "analytical",
+                       "DECODER_ALPHABET_ANALYTICAL", "DECODER_QA_ALPHABET_ANALYTICAL_CONTEXT"),
+        "detective": ("detective_decoders", "detective",
+                      "DECODER_ALPHABET_DETECTIVE", "DECODER_QA_ALPHABET_DETECTIVE_CONTEXT"),
+        "tom": ("tom_decoders", "tom",
+                "DECODER_ALPHABET_TOM", "DECODER_QA_ALPHABET_TOM_CONTEXT"),
+        "blind": ("blind_decoders", "blind",
+                  "DECODER_ALPHABET_BLIND", "DECODER_QA_ALPHABET_BLIND_CONTEXT"),
+    }
+    for vname, (arg_name, suffix, text_prompt_name, qa_prompt_name) in _PROMPT_VARIANTS.items():
+        decoder_arg = getattr(args, arg_name, None)
+        if not decoder_arg:
+            continue
+        try:
+            import src.prompts as _prompts
+        except ImportError:
+            import prompts as _prompts
+        text_prompt = getattr(_prompts, text_prompt_name)
+        qa_prompt = getattr(_prompts, qa_prompt_name)
+        var_models = [d.strip() for d in decoder_arg.split(",")]
+        for label in var_models:
+            assert label in MODELS, f"Unknown {vname} decoder: {label}"
+        var_labels = []
+        for label in var_models:
+            var_label = f"{label} ({suffix})"
+            if var_label not in MODELS:
+                MODELS[var_label] = dict(MODELS[label])
+            var_labels.append(var_label)
+        var_prompt = qa_prompt if domain == "qa" else text_prompt
+        print()
+        print(f"  {vname.capitalize()} decoders:")
+        phase_decode_all(client, http_client, db, model_labels, var_labels,
+                         var_prompt, prompt_type, args.seeds,
+                         response_parser, or_sys_key, fast=args.fast, seeds=seeds)
+        all_decoder_labels.extend(var_labels)
+
+    # Phase 3g: Factorial prompt ablation
+    if args.ablation_decoders:
+        try:
+            from src.prompts import build_ablation_prompt, ablation_label, ABL_ALL_COMBOS
+        except ImportError:
+            from prompts import build_ablation_prompt, ablation_label, ABL_ALL_COMBOS
+        abl_models = [d.strip() for d in args.ablation_decoders.split(",")]
+        for label in abl_models:
+            assert label in MODELS, f"Unknown ablation decoder: {label}"
+        if args.ablation_combos:
+            combos = [c.strip() for c in args.ablation_combos.split(",")]
+        else:
+            combos = ABL_ALL_COMBOS
+        is_qa = domain == "qa"
+        has_context = is_qa  # QA ablation decoders get context
+        print()
+        print(f"  Ablation decoders ({len(combos)} combos, parallel submit):")
+
+        # Sample trials once (shared across combos for consistency)
+        import random as _rng
+        all_preserved = {}
+        for enc_label in model_labels:
+            preserved = get_preserved_trials(db, enc_label, prompt_type, args.seeds)
+            if args.ablation_n and len(preserved) > args.ablation_n:
+                preserved = _rng.sample(preserved, args.ablation_n)
+            all_preserved[enc_label] = preserved
+
+        # Submit all combos
+        abl_batch_info = []  # (mods, abl_label, enc_label, prompt_tmpl, batch_ids, needs)
+        all_abl_bids = []
+        for mods in combos:
+            prompt_tmpl = build_ablation_prompt(mods, qa=is_qa, context=has_context)
+            for label in abl_models:
+                abl_label = ablation_label(label, mods)
+                if abl_label not in MODELS:
+                    MODELS[abl_label] = dict(MODELS[label])
+                all_decoder_labels.append(abl_label)
+
+                for enc_label in model_labels:
+                    preserved = all_preserved[enc_label]
+                    existing = get_decoded_trial_idxs(db, enc_label, prompt_type, args.seeds, abl_label)
+                    needs = [(idx, text, seed) for idx, text, seed in preserved if idx not in existing]
+                    tag = mods if mods else "(base)"
+                    if not needs:
+                        print(f"    [{tag}] {enc_label} → {abl_label}: CACHED")
+                        continue
+                    print(f"    [{tag}] {enc_label} → {abl_label}: submitting {len(needs)} trials")
+
+                    dec_cfg = MODELS[abl_label]
+                    model_id = dec_cfg["model_id"]
+                    thinking_budget = dec_cfg["thinking_budget"]
+                    requests = []
+                    for trial_idx, encoded_text, seed_text in needs:
+                        prompt = _format_decoder_prompt(prompt_tmpl, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+                        params = {
+                            "model": model_id,
+                            "max_tokens": (thinking_budget or 0) + 3000,
+                            "messages": [{"role": "user", "content": prompt}],
+                        }
+                        if thinking_budget:
+                            params["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
+                        requests.append({
+                            "custom_id": _sanitize_id(f"{enc_label}:{abl_label}:{trial_idx}"),
+                            "params": params,
+                        })
+                    batch_ids = submit_batch(client, requests)
+                    all_abl_bids.extend(batch_ids)
+                    abl_batch_info.append((mods, abl_label, enc_label, prompt_tmpl, batch_ids, needs))
+
+        # Poll all at once
+        if all_abl_bids:
+            print(f"\n    Polling {len(all_abl_bids)} batches...")
+            poll_batch(client, all_abl_bids)
+
+        # Collect all results
+        for mods, abl_label, enc_label, prompt_tmpl, batch_ids, needs in abl_batch_info:
+            results = collect_batch(client, batch_ids)
+            rows = []
+            for trial_idx, encoded_text, seed_text in needs:
+                content = results.get(_sanitize_id(f"{enc_label}:{abl_label}:{trial_idx}"))
+                text = extract_text(content)
+                decoded = response_parser(text)
+                raw = json.dumps(content) if content else None
+                dec_prompt = _format_decoder_prompt(prompt_tmpl, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+                rows.append((trial_idx, enc_label, prompt_type, args.seeds,
+                             abl_label, decoded, raw, dec_prompt))
+            save_decodes_batch(db, rows)
+            tag = mods if mods else "(base)"
+            n_ok = sum(1 for r in rows if r[5] is not None)
+            print(f"    [{tag}] {enc_label} → {abl_label}: {n_ok}/{len(rows)} decoded")
 
     # Summary
     print()

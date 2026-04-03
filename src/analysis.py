@@ -20,8 +20,8 @@ def _encode_ints(arr):
     return inv, len(uniq)
 
 
-def mi(symbols, guesses):
-    """Mutual information (plugin estimator)."""
+def mi_plugin(symbols, guesses):
+    """Mutual information (plugin estimator, no bias correction)."""
     symbols, guesses = np.asarray(symbols), np.asarray(guesses)
     n = len(symbols)
     if n == 0:
@@ -34,7 +34,30 @@ def mi(symbols, guesses):
     p_s = p_joint.sum(axis=1, keepdims=True)
     p_g = p_joint.sum(axis=0, keepdims=True)
     mask = joint > 0
-    return np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_s * p_g)[mask]))
+    return float(np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_s * p_g)[mask])))
+
+
+def mi(symbols, guesses):
+    """Mutual information (plugin estimator with Miller-Madow bias correction)."""
+    symbols, guesses = np.asarray(symbols), np.asarray(guesses)
+    n = len(symbols)
+    if n == 0:
+        return 0.0
+    si, ns = _encode_ints(symbols)
+    gi, ng = _encode_ints(guesses)
+    joint = np.zeros((ns, ng), dtype=np.int64)
+    np.add.at(joint, (si, gi), 1)
+    p_joint = joint / n
+    p_s = p_joint.sum(axis=1, keepdims=True)
+    p_g = p_joint.sum(axis=0, keepdims=True)
+    mask = joint > 0
+    mi_plugin = np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_s * p_g)[mask]))
+    # Miller-Madow correction: subtract (m_xy - m_x - m_y + 1) / (2N ln2)
+    m_xy = np.sum(joint > 0)
+    m_x = np.sum(joint.sum(axis=1) > 0)
+    m_y = np.sum(joint.sum(axis=0) > 0)
+    correction = (m_xy - m_x - m_y + 1) / (2 * n * np.log(2))
+    return max(0.0, mi_plugin - correction)
 
 
 def extract_decoder(db, encoder_model, decoder_model, prompt_type, seed_set):
@@ -84,12 +107,17 @@ def extract_paired(db, encoder_model, self_decoder, eaves_decoder, prompt_type, 
 
 
 def _mi_from_counts(joint, n):
-    """MI from a joint count matrix (single sample)."""
+    """MI from a joint count matrix (single sample, with Miller-Madow correction)."""
     p = joint / n
     p_s = p.sum(axis=1, keepdims=True)
     p_g = p.sum(axis=0, keepdims=True)
     mask = joint > 0
-    return np.sum(p[mask] * np.log2(p[mask] / (p_s * p_g)[mask]))
+    mi_plugin = np.sum(p[mask] * np.log2(p[mask] / (p_s * p_g)[mask]))
+    m_xy = np.sum(joint > 0)
+    m_x = np.sum(joint.sum(axis=1) > 0)
+    m_y = np.sum(joint.sum(axis=0) > 0)
+    correction = (m_xy - m_x - m_y + 1) / (2 * n * np.log(2))
+    return max(0.0, mi_plugin - correction)
 
 
 def _batch_mi(sym_ints, guess_ints, n_sym, n_guess, indices, n):
@@ -113,7 +141,13 @@ def _batch_mi(sym_ints, guess_ints, n_sym, n_guess, indices, n):
     denom = p_s * p_g
     valid = mask & (denom > 0)
     log_term[valid] = p[valid] * np.log2(p[valid] / denom[valid])
-    return log_term.sum(axis=(1, 2))  # (n_boot,)
+    mi_plugin = log_term.sum(axis=(1, 2))  # (n_boot,)
+    # Miller-Madow correction
+    m_xy = (joints > 0).sum(axis=(1, 2))  # (n_boot,)
+    m_x = (joints.sum(axis=2) > 0).sum(axis=1)  # (n_boot,)
+    m_y = (joints.sum(axis=1) > 0).sum(axis=1)  # (n_boot,)
+    correction = (m_xy - m_x - m_y + 1) / (2 * n * np.log(2))
+    return np.maximum(0.0, mi_plugin - correction)
 
 
 def bootstrap_delta(symbols, gs, ge, n_boot=10000):
