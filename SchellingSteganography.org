@@ -2797,9 +2797,11 @@ By Gibbs' inequality, the optimum is $q = P(Y \mid G_A)$, giving:
 
 $$= \mathbb{E}\Big[\mathbb{E}\big[\log P(Y \mid G_A) \mid G_A\big]\Big] = \mathbb{E}\big[\log P(Y \mid G_A)\big] = -H(Y \mid G_A)$$
 
-The last two equalities are tower law and the definition of conditional entropy.
+For the baseline utility $U^u_V(Y \mid X_{\text{aud}})$, we need the best decoder that doesn't use $Z$. Both families include constant decoders $f(g) = q$ for any fixed $q \in \mathcal{P}(\mathcal{A})$, which output the same distribution regardless of the model's guess $g$. Optimizing over $q$:
 
-Both families include the trivial decoder that always outputs $P(Y)$ regardless of $Z$, so $U^u_V(Y \mid X_{\text{aud}}) = -H(Y)$ by the same Gibbs argument. Therefore:
+$$U^u_V(Y \mid X_{\text{aud}}) = \sup_{q \in \mathcal{P}(\mathcal{A})} \; \mathbb{E}[\log q(Y)] = \mathbb{E}[\log P(Y)] = -H(Y)$$
+
+again by Gibbs' inequality. Therefore:
 
 $$I^u_{V_{\text{rec}}}(Z \to Y) = H(Y) - H(Y \mid G_A) = I(X; G_A)$$
 
