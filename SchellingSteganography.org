@@ -9,6 +9,8 @@ Code: [[https://github.com/ElleNajt/Steganography_Wiretapping][github.com/ElleNa
 
 [[https://ellenajt.github.io/Topics/stego/][Play the decoding game: can you eavesdrop on Claude Opus 4.6?]]
 
+
+
 * tldr of post:
 
 Frontier models can agree on Schelling steganography schemes with significant advantage against weaker eavesdroppers, given just the knowledge of the alphabet. We find that paraphrasing removes this advantage. We are able to quantify this advantage by using the notion of a secrecy capacity of a wiretap channel, which we show is a special case of the recent decision theoretic framework of Anwar et al.
@@ -2745,6 +2747,12 @@ Follow ups:
 * Acknowledgements
 
 Thank you to Fabien Roger and Usman Anwar for helpful feedback. Thank you to AFP for compute funding.
+
+* LLM Usage
+
+Claude code was used extensively for writing code and parts of this blog post.
+
+Anti-Slop Guarantee: The writing has been reviewed by the author, and many parts were written by hand. Mistakes may still lurk; feedback and corrections are welcome!
 
 * Appendix:
 
