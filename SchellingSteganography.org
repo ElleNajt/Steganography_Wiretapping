@@ -1,4 +1,4 @@
-#+title: LLMs Can Schelling-Coordinate Steganography With Positive Secrecy Capacity against Weaker Eavesdroppers and Baseline Algorithms
+#+title: Opus Can Schelling-Coordinate Steganography With Secrecy Against Weaker Eavesdroppers, But Not Gemini Pro
 #+GDOC_ID: 1mcc8tqTAPdbf3zZkYOH8yduehm3PCh2c5Bs1o-XZHCo
 #+OPTIONS: H:6 
 #+OPTIONS: ^:nil toc:nil
