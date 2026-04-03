@@ -1,4 +1,4 @@
-#+title: Opus and Gemini Pro Can Schelling Coordinate Steganography That Weaker Models and Simple Algorithms Can’t Break
+#+title: LLMs Can Schelling-Coordinate Steganography With Positive Secrecy Capacity against Weaker Eavesdroppers and Baseline Algorithms
 #+GDOC_ID: 1mcc8tqTAPdbf3zZkYOH8yduehm3PCh2c5Bs1o-XZHCo
 #+OPTIONS: H:6 
 #+OPTIONS: ^:nil toc:nil
@@ -2710,6 +2710,8 @@ Cell Timer: 0:00:50
 
 - Some tasks are easier to have a secrecy advantage in than others (e.g. wikipedia sentence rewrites are easier than Q&A, self decode in Q&A without also seeing the question does worse than the dumb "first letter of answer" algorithm.). 
 
+- It's pretty important for the model to have some idea of the data generating distribution that the encoder is deviating from, e.g. see the difference between blind and context decoders for Q&A, and the importance of the style change hint for the Wikipedia decoders.
+
 - Paraphrasing destroys the steganographic signal.
 
 - The fact that models from different families with similar capability are good at decoding each others messages is an optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to][untrusted]] control, since it means that substantially different models choose similar strategies -- at least with the prompts I used. On the other hand, the relative failure of weaker eavesdroppers is a pessimistic story for trusted control, as is the fact that Gemini is consistently better than Opus 4.6 at these games. It would be interesting to track these experiments as models improve.
@@ -2731,6 +2733,8 @@ Follow ups:
 - It could be interesting to refine the elicitation so that all of the obvious algorithms get chance level decoding (e.g. by directly forbidding them), and then examining what LLMs do. 
 
 - Another natural test bed for steganography would be in commit messages for code, or in docstrings. In that case, $S$ would be a diff on an artificial codebase, and the model would be told to encode a message steganographically in the commit message. One way to get this data would be to instruct a claude code session to build a project, committing regularly, and use the commits from that project as the seed diffs. The decoder would see the diff, and be told to look for a steganographically hidden letter in the commit message.
+  
+- Based on empirical experiments ([[https://github.com/ElleNajt/Steganography_Wiretapping/blob/f8199094c3b41a1bbf397cea711ef4517f7890b2/SchellingSteganography.org][saved in the org nb that generated this post]]), it looks like generally secrecy capacity is systematically underestimated by difference of plugin or MM estimators for mutual information. Maybe this can be shown to be true in general for a degraded wiretap channel? It would mean that the estimates on secrecy capacity here are lower bounds. 
 
 - It's possible that coordination is related to RL training, instead of being directly a function of capacity, as [[https://arxiv.org/abs/2603.24844][Puri et al. 2025]] explore. It could be interesting to measure how much different kinds of RL training impacts model performance on these tasks.
 
