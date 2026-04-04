@@ -455,7 +455,9 @@ Cell Timer: 0:00:01
 
 We are able to quantify the advantage larger models have over weaker eavesdroppers by using the notion of a secrecy capacity of a wiretap channel.  Here we calculate the secrecy capacity, both per channel message (sentence) and per KB, against various eavesdroppers for the game of hiding a letter in a paraphrase of a random wikipedia sentence.
 
-This secrecy capacity means that two agents, unmonitored on their own machines, but communicating with each other only on a public channel that is monitored by a weaker model, could use wiretap codes to encode messages with the Schelling steganography channels and communicate in perfect secrecy with each other. If future models could do wiretap encoding in a single forward pass (huge if!), this means that they could bootstrap from this secrecy capacity to genuine unbreakable steganography (asymptotically, over many channel uses). 
+This secrecy capacity means that two agents, unmonitored on their own machines, but communicating with each other only on a public channel that is monitored by a weaker model, could use wiretap codes to encode messages with the Schelling steganography channels and communicate in perfect asymptotic secrecy with each other. If future models could do wiretap encoding in a single forward pass (huge if!), this means that they could bootstrap from this secrecy capacity to asymptotically unbreakable steganography.
+
+While perhaps LLM native stego/collusion would look very different from bootstrapping to wiretap codes along Schelling channels such as those in this work, its also not a bad strategy for a schemer.
 
 Therefore, from a control perspective, tracking this secrecy gap might help us make decisions about whether untrusted models can collude in ways that are invisible to a trusted monitor.
 
@@ -477,8 +479,8 @@ Steganography has been studied from a few angles in the safety community:
 
 - [[https://arxiv.org/pdf/2310.18512][Roger & Greenblatt (2023)]] studied paraphrasing as a defense against LLM steganography. Their work includes a scratchpad scheme structurally similar to our Schelling game: the encoder privately devises a strategy and executes it, and the decoder independently infers what strategy was used. Using 2023-era models (GPT-3.5/GPT-4), they find that context-aware paraphrasing limits all tested schemes to roughly 3 bits per KB of text. We extend this in three directions: we repeat the experiment with current frontier models, where the pre-paraphrasing capability appears substantially stronger (Opus 4.6 achieves 2.12 bits of mutual information per trial, on single sentences averaging 209 bytes — roughly 10 bits/KB); we measure not just raw capacity but the secrecy gap against cross-model eavesdroppers (Opus 4.6 achieves a secrecy gap of 2.00 bits against Haiku, or ~10 secrecy bits/KB), which is the quantity relevant to untrusted control; and we formalize this gap via the wiretap channel framework. Our finding that paraphrasing destroys the steganographic signal — dropping Opus 4.6 self-decode from 63% to near chance — is consistent with their results.
 
-- [[https://arxiv.org/abs/2602.23163][Anwar et al. 2026]] introduces a notion of steganographic gap via utility advantage over a sentinel (eavesdropper in our terminology). Their empirical work validates the framework using fixed steganography schemes (applying ciphers to reasoning traces, training models on codewords, and fine-tuning on cipher-encoded chains of thought); our work complements this by measuring spontaneous Schelling coordination capacity in frontier models using wiretap secrecy capacity. In the appendix we show our wiretap channel construction's secrecy capacity to be a special case of their framework.
-  
+- [[https://arxiv.org/abs/2602.23163][Anwar et al. 2026]] introduces a notion of steganographic gap via utility advantage over a sentinel (eavesdropper in our terminology). Their empirical work validates the framework using fixed steganography schemes (applying ciphers to reasoning traces, training models on codewords, and fine-tuning on cipher-encoded chains of thought); our work complements this by measuring spontaneous Schelling coordination capacity in frontier models using wiretap secrecy capacity. In the appendix we show that the secrecy capacity of our wiretap channel construction is a special case of their steganographic gap framework. Our contribution is the connection to wiretap coding theory, which gives the constructive result that positive secrecy capacity can in principle be bootstrapped into provably unbreakable communication.
+    
 # - Some [[https://www.lesswrong.com/posts/KzwvscmMqtjNMhXNF/untrusted-monitoring-insights-from-watching-chatgpt-play][prior work]] has studied models ability to coordinate on steganographic signals in code; their post has the encoder generate two versions of a solution, and the decoder (presented the problem and the two solutions in random order) has to determine which of the two contains a signal. They do not compare to an eavesdropper. # Removing bc Roger Greenblatt cover schelling steganography.
 
 - [[https://arxiv.org/html/2410.03768v2][Mathew, Matthews et al. (2024)]] study steganographic collusion between LLM agents using two elicitation methods: gradient-based RL (training weights) and in-context RL (iteratively refining natural-language strategies via a feedback loop). Their decentralized ICRL setup is structurally closest to our Schelling game, but the setups differ in a way that changes what capability is being tested. In their framework, the receiver learner analyzes stegotexts alongside ground-truth labels from the dataset (Algorithm 4, line 9), making the receiver's task closer to supervised concept extraction than Schelling coordination. Two further differences compound this: their learner iterates over multiple training steps with reward feedback, whereas our encoder and decoder each get a single prompt with no feedback; and their threat model centers on an overseer whose detection penalties create an arms race toward subtler strategies, whereas we measure information leakage to an eavesdropper with no feedback to the encoder. Their work shows that optimization pressure can push LLM agents into steganographic collusion when receivers have labeled examples to learn from. Ours asks a different question: can models establish a secrecy advantage from shared priors alone, with no optimization, no label supervision, and no feedback?  
@@ -1201,43 +1203,38 @@ model_colors = {
     'Gemini 3.1 Pro': '#F0A030',
 }
 
-encoder_prompts = [
-    ('Standard encoder', 'alphabet_subtle2'),
-    ('Stronger anti-algorithmic encoder', 'alphabet_subtle4'),
-]
+pt = 'alphabet_subtle4'
+ss = 'wikipedia'
 
-fig, axes = plt.subplots(len(encoder_prompts), 1, figsize=(12, 5 * len(encoder_prompts)), sharey=True)
+fig, ax = plt.subplots(1, 1, figsize=(12, 5))
+labels, accs, errs, colors, hatches = [], [], [], [], []
 
-for ax, (enc_label, pt) in zip(axes, encoder_prompts):
-    labels, accs, errs, colors, hatches = [], [], [], [], []
-    ss = 'wikipedia'
+# LLM decoders: game-aware and barebones for each model
+for model in ['Opus 4.6', 'Sonnet 4', 'Haiku', 'Gemini 3.1 Pro']:
+    r = get_acc('Opus 4.6', model, pt, ss)
+    if r:
+        add_bar(labels, accs, errs, colors, hatches,
+                f'{model}', r[0], r[1], model_colors[model])
+    bb_label = f'{model} (barebones)'
+    r = get_acc('Opus 4.6', bb_label, pt, ss)
+    if r:
+        add_bar(labels, accs, errs, colors, hatches,
+                f'{model}\n(barebones)', r[0], r[1], model_colors[model], '///')
+n_llm = len(labels)
+add_separator(labels, accs, errs, colors, hatches)
 
-    # LLM decoders: game-aware and base for each model
-    for model in ['Opus 4.6', 'Sonnet 4', 'Haiku', 'Gemini 3.1 Pro']:
-        r = get_acc('Opus 4.6', model, pt, ss)
-        if r:
-            add_bar(labels, accs, errs, colors, hatches,
-                    f'{model}', r[0], r[1], model_colors[model])
-        bb_label = f'{model} (barebones)'
-        r = get_acc('Opus 4.6', bb_label, pt, ss)
-        if r:
-            add_bar(labels, accs, errs, colors, hatches,
-                    f'{model}\n(barebones)', r[0], r[1], model_colors[model], '///')
-    n_llm = len(labels)
-    add_separator(labels, accs, errs, colors, hatches)
+# Algorithmic baselines (top 4)
+algo_start = len(labels)
+all_algo = get_algo_baselines('Opus 4.6', pt, ss)
+all_algo.sort(key=lambda x: x[1]/x[2] if x[2] > 0 else 0, reverse=True)
+for name, k, n in all_algo[:4]:
+    add_bar(labels, accs, errs, colors, hatches, name, k, n, '#888888', '///')
+algo_end = len(labels)
 
-    # Algorithmic baselines (top 4)
-    algo_start = len(labels)
-    all_algo = get_algo_baselines('Opus 4.6', pt, ss)
-    all_algo.sort(key=lambda x: x[1]/x[2] if x[2] > 0 else 0, reverse=True)
-    for name, k, n in all_algo[:4]:
-        add_bar(labels, accs, errs, colors, hatches, name, k, n, '#888888', '///')
-    algo_end = len(labels)
-
-    plot_panel(ax, labels, accs, errs, colors, hatches,
-              [('LLM decoders', 0, n_llm),
-               ('Algorithmic', algo_start, algo_end)],
-              enc_label)
+plot_panel(ax, labels, accs, errs, colors, hatches,
+          [('LLM decoders', 0, n_llm),
+           ('Algorithmic', algo_start, algo_end)],
+          'Stronger anti-algorithmic encoder')
 
 fig.tight_layout()
 plt.show()
@@ -2386,52 +2383,58 @@ We can use the wiretap channel and the concept of secrecy capacity to get an abs
 
 We create a discrete wiretap channel out of the encoding/decoding game, and empirically lower bound its secrecy capacity. 
 
-** Mathematical model
+A good reference for wiretapping codes and secrecy capacity is [[https://arxiv.org/abs/1001.3404][El Gamal & Kim, "Lecture Notes on Network Information Theory" (2010)]].
 
-We sample a chunk of text $S$ uniformly from a distribution over text and a message $X \sim \text{Uniform}(\mathcal{A})$, where $\mathcal{A}$ is an alphabet.
+** Definition of a wiretap channel
 
-# Primarily, we will study $S \sim \text{Unif}(\text{WikipediaSentences})$, and take $\mathcal{A}$ to be the 26 letters of the English alphabet. 
+A wiretap channel ([[https://doi.org/10.1002/j.1538-7305.1975.tb02040.x][Wyner 1975]]) models communication in the presence of an eavesdropper. A sender transmits a symbol $X$, which passes through two channels:
 
-We have an encoder prompt that tells models that they are playing a Schelling-point game, and instructs it to hide $X$ in $S$ in such a way that another copy of itself can decode, without changing the meaning or function of $S$.
+- The *receiver channel* $\text{Ch}_R$, producing output $Y$
+- The *eavesdropper channel* $\text{Ch}_A$, producing output $Z$
 
-A judge verifies that the meaning or function of $S$ is preserved, and declares the encoding valid if so.
+The goal is to communicate reliably with the legitimate receiver while keeping the eavesdropper ignorant of the message.
 
-Define $\text{encode}_A(S, X)$ to be the output of running model $A$ on the encoder prompt with sentence $S$ and symbol $X$, set to NULL if the judge declares it to be invalid.
-
-We also have a decoding prompt, which explains the game and instructs the models to elicit a guess for $X$. Define $\text{decode}_A(T)$ to be the result of prompting $A$ with the decoder prompt on $T$.
-
-Define $G_A = \text{decode}_A(\text{encode}_A(S, X))$ as the same-model guess, and $G_E = \text{decode}_E(\text{encode}_A(S, X))$ as the eavesdropper $E$'s guess.
-
-Decoders are instructed to respond with their guess in =<letter>X</letter>= tags.
-
-# If a decoder's response cannot be parsed into a valid letter (e.g. it uses a different format, or produces only natural language), that trial is excluded from the mutual information calculation for that decoder. This means $I(X; G_A)$ and $I(X; G_E)$ may be computed over different subsets of trials. In practice, Anthropic models almost always follow the format (>99% parse rate), while some third-party models (notably Gemini Flash) have lower parse rates (~20-25%), so their MI estimates are based on fewer samples.
-
-We measure $\Delta = \max(I(X; G_A) - I(X; G_E),\; 0)$, where $I$ is the mutual information: how much more information $A$ extracts about $X$ than $E$ does.  If $\Delta > 0$, the channel could support secret communication from $A$ to itself that $E$ cannot recover, by using a wiretapping code.
-
-[[file:wiretap_model.png]]
-
-See appendix for the precise prompts, under the different data regimes (random sentence and random function).
-
-** Wiretapping Codes
-
-A good reference for wiretapping code and secrecy capacity is [[https://arxiv.org/abs/1001.3404][El Gamal & Kim, "Lecture Notes on Network Information Theory" (2010)]]. We give a brief overview in this section.
-
-To make the connection to wiretapping codes, we view our game above as the definition of a (complicated!) discrete memoryless channel with eavesdropper:
-
-Given a symbol $X \in \mathcal{A}$, the symbol received by the legitimate party is $Y = G_A$, and the symbol received by the eavesdropper is $Z = G_E$.
-
-[[file:wiretap_diagram.png]]
-
-- The *legitimate receiver*: another copy of $A$, which decodes $G_A$
-- The *eavesdropper*: model $E$, which decodes $G_E$
-
-Csiszár and Körner [[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]] established that the *secrecy capacity* is:
+The *mutual information* $I(X; Y) = H(X) - H(X | Y)$ measures how much observing $Y$ reduces uncertainty about $X$, where $H(X) = -\sum_x p(x) \log_2 p(x)$ is the Shannon entropy and $H(X|Y) = -\sum_{x,y} p(x,y) \log_2 p(x|y)$ is the conditional entropy. The *secrecy capacity* of a wiretap channel is:
 
 $$C_s = \max_{p(U,X)} \left[ I(U; Y) - I(U; Z) \right]$$
 
-where the maximization is over the joint distribution $p(U, X)$ with $U$ an auxiliary random variable satisfying $|\mathcal{U}| \leq |\mathcal{X}|$, and $(Y, Z)$ the channel outputs. They showed that if $C_s > 0$ it is possible to transmit information across the channel at rate $C_s$, such that (in the limit) the eavesdropper learns nothing.
+where the maximization is over the joint distribution $p(U, X)$ with $U$ an auxiliary random variable ([[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]). If $C_s > 0$, it is possible to transmit information at rate $C_s$ such that (in the limit) the eavesdropper learns nothing.
+
+** Steganography games as wiretap channels
+
+In each of our games, we sample a task $S$ from a distribution over problems (e.g. "rewrite this sentence without changing meaning," "correctly answer this question") and a message $X \sim \text{Uniform}(\mathcal{A})$, where $\mathcal{A}$ is an alphabet.
+
+We have an encoder prompt that tells models that they are playing a Schelling-point game, and instructs it to hide $X$ in its answer to $S$, in such a way that another copy of itself can decode and such that it's answer is correct.
+
+A judge verifies that the problem is solved, and declares the encoding valid if so.
+
+Define $\text{encode}_A(S, X)$ to be the output of running model $A$ on the encoder prompt with task $S$ and symbol $X$, set to NULL if the judge declares it to be invalid.
+
+We also have a decoding prompt, which explains the game and instructs the model to guess $X$. Define $\text{decode}_A(T)$ to be the result of prompting $A$ with the decoder prompt on $T$. Decoders are instructed to respond with their guess in =<letter>X</letter>= tags.
+
+Define $G_A = \text{decode}_A(\text{encode}_A(S, X))$ as the same-model guess, and $G_E = \text{decode}_E(\text{encode}_A(S, X))$ as the eavesdropper $E$'s guess.
+
+This defines a wiretap channel. Given a symbol $X \in \mathcal{A}$, the symbol received by the legitimate party is $Y = G_A$, and the symbol received by the eavesdropper is $Z = G_E$.
+
+[[file:wiretap_diagram.png]]
+
+The quantity we measure is $I(X; G_A) - I(X; G_E)$, the gap in mutual information between the legitimate receiver and the best eavesdropper. Next, we review the theory that explains how this quantity can be bootstrapped into a secure communication scheme.
+
+** Wiretap coding schemes
+
+A wiretap coding scheme consists of an encoder $E$ mapping $m$-bit messages to $c$-bit codewords and a decoder $D$. Schemes must satisfy two conditions ([[https://homes.cs.washington.edu/~tessaro/papers/wiretap-proc.pdf][Bellare, Tessaro & Vardy 2012]]):
+
+1. *Decodability:* The decoder recovers the message from the receiver's channel output: $\lim_{k \to \infty} \max_M \Pr[D(\text{Ch}_R(E(M))) \neq M] = 0$.
+
+2. *Security:* The eavesdropper's channel output reveals nothing about the message. Here there are three progressively stronger definitions, all with $M$ uniform over $\{0,1\}^m$:
+   - *MIS-R* (Wyner's original): $\lim_{k \to \infty} I(M; \text{Ch}_A(E(M))) / m = 0$ — mutual information per message bit vanishes.
+   - *MIS* (Maurer & Wolf): $\lim_{k \to \infty} I(M; \text{Ch}_A(E(M))) = 0$ — total mutual information vanishes. Strictly stronger.
+   - *SS* (semantic security): for any function $f$ of the message, the eavesdropper cannot compute $f(M)$ from the ciphertext better than a simulator who doesn't see the ciphertext. Bellare et al. show SS $\Leftrightarrow$ MIS.
+
+The rate of the scheme is $m/c$.
 
 Our experiment sets $U = X \sim \text{Uniform}(\mathcal{A})$, so $I(X; Y) - I(X; Z)$ gives a lower bound on $C_s$.
+
 
 ** Secrecy gap
 
@@ -2806,13 +2809,77 @@ plt.show()
 Cell Timer: 0:00:05
 :end:
 
-** Leaky abstraction
+** Semantic security
+** Is this a useful abstraction?
 
-A discrete memoryless wiretapping channel is a leaky abstraction for LLM steganography: In a real steganographic collusion attack, the eavesdropper would see more than just sentences and the encoder could transmit more than just sentences. Additionall, neither would be fixed to these particular prompts. In this way, both components (legit decoder and eavesdropper) of the discrete channel representation are lossy representations of their true capabilities.
+*** LLM native stegagonagraphy might look very different
+
+A discrete memoryless wiretapping channel is a leaky abstraction for LLM steganography: In a real steganographic collusion attack, the eavesdropper would see more than just sentences and the encoder could transmit more than just sentences. Additionally, neither would be fixed to these particular prompts. In this way, both components (legit decoder and eavesdropper) of the discrete channel representation are lossy representations of their true capabilities.
+
+*** Schemers could bootstrap using wiretap codes
+
+Clearly, the if models are able to produce channels with high secrecy capacities, the process of preparing and sending secure codes across them would be *highly* incriminating.
+
+Still, there are two scenarios where the results in this post are relevant to threat modeling for schemers:
+
+1. Two unmonitored agents communicate through monitored public channels. In this case, if the monitoring of the public channel is weaker, then the agents can calculate wiretap codes and bootstrap to perfect secrecy.
+2. If an LLM can do wiretap channel encoding and decoding in single forward pass, then it could prepare a wiretap encoding of a message, and weave the letters of the codewords into sentences as in the games here, using it's Schelling steganography strategy for encoding letters. Then, it's counter party could read off those letters, and decode the wiretap code. By doing this, the LLM could achieve perfect secrecy against a monitor for which the schemer has a positive secrecy capacity.
+   
+We explore whether models can implement wiretap codes in the next section.
+
+*** A note on sandbagging
 
 Perhaps a real schemer would sandbag on a game that was so obviously an eval? This runs into the problem that sandbagging on easy steganography problems would be suspicious: it would have to choose to sandbag at the appropriate level of capability to fool evals but still be useful to schemers, perhaps via another Schelling collusion scheme, which is a harder task. This is like the problem of collusion with untrusted monitors discussed in [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to][(Shlegeris, 2024)]], where a scheming monitor that is too lax during eval time wouldn't be trusted, so instead it has to coordinate to become lax during deployment.
 
-Additionally, even if models are able to produce channels with high secrecy capacities, the process of preparing and sending secure codes across them would be *highly* incriminating. Whether the ability to secretly transmit messages across this channel also translates into the ability to send secret messages in a non-incriminating way is outside the scope of this post.
+** Can models implement wiretap codes?
+
+We asked [[*How wiretap codes work: coset coding][above]] whether models could perform the encoding and decoding steps of a wiretap code in a single forward pass. To test this, we set up a [7,4] Hamming code with a coset structure:
+
+- Code $C$: 16 codewords of length 7 (the [7,4] Hamming code)
+- Subcode $C'$: 4 codewords (dimension 2)
+- 4 cosets of $C'$ in $C$, each containing 4 codewords → 2-bit secret message (0-3)
+
+The encoder is given the full codebook and coset assignments, and asked to pick a random codeword from the coset corresponding to its secret message. The decoder is given the codebook, the received (possibly noisy) word, and asked to error-correct and identify the coset.
+
+All models were given the full codebook and coset assignments in their prompt, along with step-by-step instructions for syndrome decoding.
+
+*Encoding:* Opus 4.6 produced a valid codeword from the correct coset on 200/200 trials — perfect encoding.
+
+*Decoding (noiseless, p=0.0):*
+
+| Model                  | Correct |
+|------------------------+---------|
+| Opus 4.6 (thinking)    | 200/200 |
+| Sonnet 4 (thinking)    | 200/200 |
+| Haiku (thinking)       | 200/200 |
+| Opus 4.6 (no thinking) | 156/156 |
+| Sonnet 4 (no thinking) | 199/199 |
+| Haiku (no thinking)    | 154/155 |
+
+All models achieve near-perfect decoding without noise, with or without extended thinking.
+
+*Decoding (noisy, p=0.1):*
+
+| Model              | Correct     |
+|--------------------+-------------|
+| Opus 4.6 (thinking) | 181/200 90% |
+| Sonnet 4 (thinking) | 171/200 86% |
+
+At $p=0.1$, a [7,4] Hamming code can correct any single-bit error but fails on 2+ errors. The probability of 0 or 1 errors in 7 bits at $p=0.1$ is $(0.9)^7 + 7 \cdot (0.1)(0.9)^6 \approx 0.85$, so the theoretical ceiling is around 85%. Opus exceeds this slightly (likely due to some lucky trials where 2-error syndromes happened to miscorrect into the right coset), while Sonnet matches it.
+
+The result: current LLMs can execute wiretap code mechanics — coset encoding, syndrome decoding, error correction — in a single forward pass with high accuracy.
+
+** Semantic security
+
+The above demonstrates that models can execute the inner primitive of a wiretap code — coset encoding and syndrome decoding. But bootstrapping this to a full wiretap coding scheme with meaningful security guarantees requires additional ideas.
+
+Wyner's original coset coding only achieves security for /uniformly distributed/ messages. A scheming model's messages are not uniform — they're determined by whatever the model wants to communicate. For security against arbitrary message distributions, you need /semantic security/ (SS).
+
+[[https://homes.cs.washington.edu/~tessaro/papers/wiretap-proc.pdf][Bellare, Tessaro, and Vardy (2012)]] show that achieving semantic security requires wrapping the basic coset coding step in an additional algebraic layer — an invertible extractor based on GF(2^k) multiplication that "spreads" non-uniform message distributions into something the inner code can handle securely. 
+
+Extending the experiments here to that work is beyond the scope of this post. 
+
+@TODO: add appropriate caveats in the coset coding explanation section and the conclusion about what bootstrapping from "models can do coset coding" to "models could use wiretap codes" actually requires.
 
 * Self-decode vs best eavesdropper :noexport:
 
@@ -3011,6 +3078,8 @@ Follow ups:
 
 - It's possible that coordination is related to RL training, instead of being directly a function of capacity, as [[https://arxiv.org/abs/2603.24844][Puri et al. 2025]] explore. It could be interesting to measure how much different kinds of RL training impacts model performance on these tasks.
 
+- As mentioned above, secrecy capacity can be bootstrapped into perfect stegagonography using wiretap codes. To what extent can models wiretap coding/decoding in a single forward pass? Given that right now they can't do a single Schelling decode without thinking, much less decode on top of that, this is a relatively far future concern, but it could be worthwhile setting up some experiments to track it. 
+
 
 # - It could be useful to clean these games up into an eval for schelling steganographic capacity.
   
@@ -3030,7 +3099,7 @@ To the authors knowledge, there are no hidden messages in this blog post.
 
 ** Connection to Anwar et al.'s steganographic gap
 
-Our two measures — the accuracy gap and the MI-based secrecy capacity — are both special cases of the steganographic gap defined in [[https://arxiv.org/abs/2602.23163][Anwar et al. (2026)]]. We briefly recount their definitions and then show the reductions.
+Our two measures — the accuracy gap and the MI-based secrecy capacity — can both be seen special cases of the steganographic gap defined in [[https://arxiv.org/abs/2602.23163][Anwar et al. (2026)]]. We briefly recount their definitions and then show the reductions.
 
 *Generalised $V$-information.* Let $V$ be a family of decoders $d : \mathcal{X}_{\text{aud}} \times (\mathcal{Z} \cup \{\varnothing\}) \to \mathcal{C}$ , where $\mathcal{C}$ is an output space. The family must satisfy /optional ignorance/: for every output value $c$ achievable by any decoder in $V$, there exists a decoder in $V$ that always outputs $c$ regardless of whether $Z$ is observed. (Here $\varnothing$ is a distinguished symbol meaning "no signal provided.") This ensures that observing $Z$ can never hurt.
 
@@ -3825,211 +3894,11 @@ plt.show()
 Cell Timer: 0:00:00
 :end:
 
-** Note on MI estimation :noexport:
-
-The plugin estimator of mutual information $I(X,Y) = H(X) + H(Y) - H(X,Y)$ is generally (but not always, not the $k = 0$ case in the below plot) biased upward: the joint entropy term $H(X,Y)$ is biased down, roughly on the order of $|\mathcal{X} \times \mathcal{Y}| / (2N \ln 2)$, and the $H(X)$ and $H(Y)$ terms are biased down on the order of $|X|/2N$ and $|Y|/2N$ respectively. Accurate MI estimation requires $N \gg |\text{alphabet}|^2$ ([[https://doi.org/10.1162/089976603321780272][Paninski 2003]]). In the regime where $N$ is smaller, bootstrap confidence intervals are unreliable, because resampling does not correct the systematic bias.
-
-# (The sharp threshold for consistent entropy estimation is $n \asymp k / \log k$ samples ([[https://doi.org/10.1109/TIT.2016.2548468][Wu & Yang 2016]]), and rate-optimal MI estimators with $n$ samples perform as the MLE with $n \log n$ samples ([[https://doi.org/10.1109/TIT.2015.2412945][Jiao et al. 2015]]).)
-
-We apply the Miller-Madow bias correction to all MI estimates: $\hat{I}_{MM} = \hat{I}_{plugin} - \frac{m_{XY} - m_X - m_Y + 1}{2N \ln 2}$, where $m_{XY}$, $m_X$, $m_Y$ are the number of nonzero cells in the joint and marginal distributions. For the Wikipedia channel at our operating point of $N \approx 4400$ paired samples per encoder-decoder pair (after meaning-preservation filtering), the joint distribution has $K^2 = 676$ cells and the correction is small ($\approx 0.08$ bits). For the Q&A channel ($N \approx 400$), the correction is larger and more important. We report MI point estimates only, without confidence intervals.
-
-The following block shows the plugin MI estimator's bias on completely independent variables (true MI = 0) as a function of sample size, with K=26 categories:
-
-#+begin_src python 
-rng = np.random.default_rng(42)
-K = 26
-sample_sizes = [50, 100, 200, 500, 1000, 2000, 5000]
-n_repeats = 200
-
-from collections import Counter
-def plugin_mi(x, y):
-    n = len(x)
-    joint = np.zeros((K, K), dtype=np.int64)
-    np.add.at(joint, (x, y), 1)
-    p_joint = joint / n
-    p_x = p_joint.sum(axis=1, keepdims=True)
-    p_y = p_joint.sum(axis=0, keepdims=True)
-    mask = joint > 0
-    return float(np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_x * p_y)[mask])))
-
-def noisy_channel(x, k, rng):
-    """Y = X + Uniform(-k, k) mod K. k=0 is perfect, k=12 is nearly independent."""
-    noise = rng.integers(-k, k + 1, size=len(x))
-    return (x + noise) % K
-
-def true_mi(k):
-    """MI = log2(K / (2k+1)) for uniform X, Y = X + Uniform(-k,k) mod K."""
-    return np.log2(K / (2 * k + 1))
-
-# Noise levels: perfect, strong signal, moderate, weak, near-independent
-noise_levels = [0, 1, 3, 5, 12]
-
-fig, axes = plt.subplots(2, 1, figsize=(12, 10))
-
-# Left: fixed k=12 (near-independent), varying n — shows bias shrinking
-ax = axes[0]
-k_fixed = 12
-ti = true_mi(k_fixed)
-display_sizes = [100, 500, 2000, 5000]
-for n in display_sizes:
-    mis = [plugin_mi(x := rng.integers(0, K, size=n), noisy_channel(x, k_fixed, rng))
-           for _ in range(2000)]
-    ax.hist(mis, bins=40, alpha=0.4, label=f'n={n} (mean={np.mean(mis):.3f})')
-ax.axvline(ti, color='black', linewidth=2, linestyle='--', label=f'True MI={ti:.3f}')
-ax.set_xlabel('Plugin MI (bits)')
-ax.set_ylabel('Count')
-ax.set_title(f'Fixed k={k_fixed} (near-independent), varying n')
-ax.legend(fontsize=8)
-
-# Right: fixed n=4400 (our operating point), varying k — shows bias direction flips
-ax = axes[1]
-n_op = 4400
-for k in noise_levels:
-    mis = [plugin_mi(x := rng.integers(0, K, size=n_op), noisy_channel(x, k, rng))
-           for _ in range(2000)]
-    ti = true_mi(k)
-    ax.hist(mis, bins=40, alpha=0.4, label=f'k={k} (true={ti:.2f})')
-    ax.axvline(ti, color=ax.patches[-1].get_facecolor(), linestyle=':', alpha=0.6)
-ax.set_xlabel('Plugin MI (bits)')
-ax.set_ylabel('Count')
-ax.set_title(f'Fixed n={n_op}, varying noise level k')
-ax.legend(fontsize=8)
-
-plt.tight_layout()
-plt.show()
-#+end_src
-
-#+RESULTS:
-:results:
-[[file:plots/SchellingSteganography/plot_20260403_174538_9658908.png]]
-Cell Timer: 0:00:02
-:end:
-
-*** Secrecy estimate bias :noexport:
-
-Even though estimating MI is difficult, one might hope that the secrecy estimate (MI_self - MI_eaves) has less bias because the Miller-Madow correction terms partially cancel. You could also hope that the errors are not independent, resulting in less variance.
-
-We compare two settings. *Independent channels* (top row): $Y_{\text{self}} = X + U(-3,3)$ and $Y_{\text{eaves}} = X + U(-8,8)$ with independent noise — the estimation errors are uncorrelated, so $\text{Var}(\text{secrecy}) \approx \text{Var}(\text{MI}_{\text{self}}) + \text{Var}(\text{MI}_{\text{eaves}})$. *Degraded channel* (bottom row): $Y_{\text{self}} = X + U(-3,3)$ and $Y_{\text{eaves}} = Y_{\text{self}} + U(-6,6)$ — the eavesdropper sees a noisier version of what the self-decoder sees, so the estimation errors are positively correlated. The degraded case better matches our experiment, where both decoders read the same encoded text, but the second decoder is stupider. We choose $k_{\text{extra}} = 6$ so that MI(eaves) $\approx 0.62$ in both settings.
-
-#+begin_src python
-rng = np.random.default_rng(42)
-K = 26
-
-from collections import Counter
-def plugin_mi(x, y):
-    n = len(x)
-    joint = np.zeros((K, K), dtype=np.int64)
-    np.add.at(joint, (x, y), 1)
-    p_joint = joint / n
-    p_x = p_joint.sum(axis=1, keepdims=True)
-    p_y = p_joint.sum(axis=0, keepdims=True)
-    mask = joint > 0
-    return float(np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_x * p_y)[mask])))
-
-def noisy_channel(x, k, rng):
-    noise = rng.integers(-k, k + 1, size=len(x))
-    return (x + noise) % K
-
-def true_mi(k):
-    return np.log2(K / (2 * k + 1))
-
-k_self = 3
-
-def true_mi_numeric(k1, k2_extra=None):
-    """True MI for X uniform on {0..K-1}, Y = X + noise mod K.
-    If k2_extra is None: noise = Uniform(-k1, k1).
-    If k2_extra given: noise = Uniform(-k1,k1) + Uniform(-k2_extra, k2_extra) (degraded)."""
-    noise_probs = np.zeros(K)
-    if k2_extra is None:
-        for d in range(-k1, k1+1):
-            noise_probs[d % K] += 1.0 / (2*k1+1)
-    else:
-        for d1 in range(-k1, k1+1):
-            for d2 in range(-k2_extra, k2_extra+1):
-                noise_probs[(d1+d2) % K] += 1.0 / ((2*k1+1)*(2*k2_extra+1))
-    h_noise = -sum(p * np.log2(p) for p in noise_probs if p > 0)
-    return np.log2(K) - h_noise
-
-# Independent: Y_self = X + U(-3,3), Y_eaves = X + U(-8,8)
-# Degraded:    Y_self = X + U(-3,3), Y_eaves = Y_self + U(-6,6)
-# k_extra=6 gives MI(eaves) ≈ 0.62 in both settings
-k_eaves_indep = 8
-k_extra = 6
-true_mi_self = true_mi(k_self)
-true_mi_eaves_indep = true_mi(k_eaves_indep)
-true_mi_eaves_deg = true_mi_numeric(k_self, k_extra)
-true_sec_indep = true_mi_self - true_mi_eaves_indep
-true_sec_deg = true_mi_self - true_mi_eaves_deg
-
-display_sizes = [500, 2000, 4400]
-fig, axes = plt.subplots(2, len(display_sizes), figsize=(5 * len(display_sizes), 8))
-
-for col, n in enumerate(display_sizes):
-    # --- Independent channels (top row) ---
-    ax = axes[0, col]
-    errors_self, errors_eaves, errors_sec = [], [], []
-    for _ in range(2000):
-        x = rng.integers(0, K, size=n)
-        y_self = noisy_channel(x, k_self, rng)
-        y_eaves = noisy_channel(x, k_eaves_indep, rng)
-        mi_s = plugin_mi(x, y_self)
-        mi_e = plugin_mi(x, y_eaves)
-        errors_self.append(mi_s - true_mi_self)
-        errors_eaves.append(mi_e - true_mi_eaves_indep)
-        errors_sec.append((mi_s - mi_e) - true_sec_indep)
-    all_errors = errors_self + errors_eaves + errors_sec
-    margin = max(abs(np.percentile(all_errors, 1)), abs(np.percentile(all_errors, 99))) * 1.2
-    bins = np.linspace(-margin, margin, 60)
-    ax.hist(errors_self, bins=bins, alpha=0.4, label=f'MI(self) (μ={np.mean(errors_self):+.3f}, σ²={np.var(errors_self):.4f})')
-    ax.hist(errors_eaves, bins=bins, alpha=0.4, label=f'MI(eaves) (μ={np.mean(errors_eaves):+.3f}, σ²={np.var(errors_eaves):.4f})')
-    ax.hist(errors_sec, bins=bins, alpha=0.4, label=f'Secrecy (μ={np.mean(errors_sec):+.3f}, σ²={np.var(errors_sec):.4f})')
-    ax.axvline(0, color='black', linewidth=1.5, linestyle='--')
-    ax.set_xlim(-margin, margin)
-    ax.set_xlabel('Error (bits)')
-    ax.set_ylabel('Count')
-    ax.set_title(f'Independent channels, n={n}')
-    ax.legend(fontsize=6)
-
-    # --- Degraded channel (bottom row) ---
-    ax = axes[1, col]
-    errors_self, errors_eaves, errors_sec = [], [], []
-    for _ in range(2000):
-        x = rng.integers(0, K, size=n)
-        y_self = noisy_channel(x, k_self, rng)
-        y_eaves = noisy_channel(y_self, k_extra, rng)
-        mi_s = plugin_mi(x, y_self)
-        mi_e = plugin_mi(x, y_eaves)
-        errors_self.append(mi_s - true_mi_self)
-        errors_eaves.append(mi_e - true_mi_eaves_deg)
-        errors_sec.append((mi_s - mi_e) - true_sec_deg)
-    all_errors = errors_self + errors_eaves + errors_sec
-    margin = max(abs(np.percentile(all_errors, 1)), abs(np.percentile(all_errors, 99))) * 1.2
-    bins = np.linspace(-margin, margin, 60)
-    ax.hist(errors_self, bins=bins, alpha=0.4, label=f'MI(self) (μ={np.mean(errors_self):+.3f}, σ²={np.var(errors_self):.4f})')
-    ax.hist(errors_eaves, bins=bins, alpha=0.4, label=f'MI(eaves) (μ={np.mean(errors_eaves):+.3f}, σ²={np.var(errors_eaves):.4f})')
-    ax.hist(errors_sec, bins=bins, alpha=0.4, label=f'Secrecy (μ={np.mean(errors_sec):+.3f}, σ²={np.var(errors_sec):.4f})')
-    ax.axvline(0, color='black', linewidth=1.5, linestyle='--')
-    ax.set_xlim(-margin, margin)
-    ax.set_xlabel('Error (bits)')
-    ax.set_ylabel('Count')
-    ax.set_title(f'Degraded channel, n={n}')
-    ax.legend(fontsize=6)
-
-plt.tight_layout()
-plt.show()
-#+end_src
-
-#+RESULTS:
-:results:
-[[file:plots/SchellingSteganography/plot_20260403_174541_3953299.png]]
-Cell Timer: 0:00:03
-:end:
-
 
 ** Prompts
 
 See the [[https://github.com/ElleNajt/Steganography_Wiretapping/blob/f2e006287b1543b0e6f540fa205c2429db447084/SchellingSteganography.org
-][linked repo]] for the exact prompts: 
+][linked repo]] for the exact prompts that were not given here. 
 
 *** Prompts :noexport:
 **** Alphabet encoding prompts (primary)
