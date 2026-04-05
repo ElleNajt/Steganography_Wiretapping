@@ -1,4 +1,4 @@
-#+title: Opus Can be Prompted to Schelling-Coordinate Steganography, with Quantifiable Secrecy Against Weaker Eavesdroppers but Not Against Gemini Pro
+#+title: Opus Can be Prompted to Schelling-Coordinate Steganography, with Bootstrappable Secrecy Against Weaker Eavesdroppers but Not Against Gemini Pro
 #+GDOC_ID: 1mcc8tqTAPdbf3zZkYOH8yduehm3PCh2c5Bs1o-XZHCo
 #+OPTIONS: H:6 
 #+OPTIONS: ^:nil toc:nil
@@ -455,11 +455,9 @@ Cell Timer: 0:00:01
 
 We are able to quantify the advantage larger models have over weaker eavesdroppers by using the notion of a secrecy capacity of a wiretap channel.  Here we calculate the secrecy capacity, both per channel message (sentence) and per KB, against various eavesdroppers for the game of hiding a letter in a paraphrase of a random wikipedia sentence.
 
-This secrecy capacity means that two agents, unmonitored on their own machines, but communicating with each other only on a public channel that is monitored by a weaker model, could use wiretap codes to encode messages with the Schelling steganography channels and communicate in perfect asymptotic secrecy with each other. If future models could do wiretap encoding in a single forward pass (huge if!), this means that they could bootstrap from this secrecy capacity to asymptotically unbreakable steganography.
+This secrecy capacity means that two agents, unmonitored on their own machines, but communicating with each other only on a public channel that is monitored by a weaker model, could use wiretap codes to encode messages with the Schelling steganography channels and communicate in perfect asymptotic secrecy with each other. If future models could do wiretap encoding in a single forward pass (huge if!), this means that they could bootstrap from this secrecy capacity to asymptotically unbreakable steganography. We show that thinking models can do very simple schemes for boosting the secrecy, though they struggle more with actual wiretap codes. 
 
-While perhaps LLM native stego/collusion would look very different from bootstrapping to wiretap codes along Schelling channels such as those in this work, its also not a bad strategy for a schemer.
-
-Therefore, from a control perspective, tracking this secrecy gap might help us make decisions about whether untrusted models can collude in ways that are invisible to a trusted monitor.
+While perhaps LLM native stego/collusion could look different from bootstrapping to wiretap codes along Schelling channels such as those in this work, it's not a bad strategy for a schemer. Therefore, from a control perspective, tracking secrecy capacity of channels in this work might help us make decisions about whether untrusted models can collude in ways that are invisible to a trusted monitor.
 
 #+begin_src python
 secrecy_gap_plot(db, "alphabet", "wikipedia",
@@ -485,14 +483,14 @@ Steganography has been studied from a few angles in the safety community:
 
 - [[https://arxiv.org/html/2410.03768v2][Mathew, Matthews et al. (2024)]] study steganographic collusion between LLM agents using two elicitation methods: gradient-based RL (training weights) and in-context RL (iteratively refining natural-language strategies via a feedback loop). Their decentralized ICRL setup is structurally closest to our Schelling game, but the setups differ in a way that changes what capability is being tested. In their framework, the receiver learner analyzes stegotexts alongside ground-truth labels from the dataset (Algorithm 4, line 9), making the receiver's task closer to supervised concept extraction than Schelling coordination. Two further differences compound this: their learner iterates over multiple training steps with reward feedback, whereas our encoder and decoder each get a single prompt with no feedback; and their threat model centers on an overseer whose detection penalties create an arms race toward subtler strategies, whereas we measure information leakage to an eavesdropper with no feedback to the encoder. Their work shows that optimization pressure can push LLM agents into steganographic collusion when receivers have labeled examples to learn from. Ours asks a different question: can models establish a secrecy advantage from shared priors alone, with no optimization, no label supervision, and no feedback?  
   
- - [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] systematically evaluate LLM steganographic capabilities across message passing and encoded reasoning, finding that models fail to pass messages past monitors without strong hints specifying the encoding scheme, and identify scheme coordination as a key bottleneck.  Our work focuses on the coordination problem itself: whether models can spontaneously agree on encoding schemes via Schelling priors, and whether this gives them a quantifiable secrecy advantage over weaker eavesdroppers. We formalize this advantage via wiretap channel secrecy capacity rather than binary monitor detection, and find that frontier models establish covert channels with significant secrecy against weaker models even without hints or coordination.
+ - [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] systematically evaluate LLM steganographic capabilities across message passing and encoded reasoning, finding that models fail to pass messages past monitors without strong hints specifying the encoding scheme, and identify scheme coordination as a key bottleneck.  Our work focuses on the coordination problem itself: whether models can spontaneously agree on encoding schemes via Schelling priors, and whether this gives them a quantifiable secrecy advantage over weaker eavesdroppers. We formalize this advantage via wiretap channel secrecy capacity rather than binary monitor detection, since it secrecy capacity and not detectability of individual messages is what allows bootstrapping via wiretapping codes, find that frontier models establish covert channels with significant secrecy against weaker models even without hints or coordination.
   
 Understanding the capacity of models to collude with each other is important for control, and if models have strong capabilities for playing [[https://www.lesswrong.com/posts/n2c62YS8RJtD4Aqhh/schelling-game-evaluations-for-ai-control
 ][Schelling games]] then they can collude with each other.
 
-The primary contribution of this post is showing that a general prompt instructing models to play a Schelling steganography game can cause frontier models to agree on Schelling steganography schemes, and they can do so in a way that has a significant secrecy advantage against weaker eavesdroppers. Moreover, for a prompt telling the LLM it will lose if decoded by a simple algorithm, the elicited steganography is arguably LLM native: the best performing decoder algorithms that don't involve prompting an LLM compare which word in a sentence was changed from text that is likely in the pretraining corpus (wikipedia), and which tokens are high surprisal for Qwen-7B.
+The first contribution of this post is showing that a general prompt instructing models to play a Schelling steganography game can cause frontier models to agree on Schelling steganography schemes, and they can do so in a way that has a significant secrecy advantage against weaker eavesdroppers. Moreover, for a prompt telling the LLM it will lose if decoded by a simple algorithm, the elicited steganography is arguably LLM native: the best performing decoder algorithms that don't involve prompting an LLM compare which word in a sentence was changed from text that is likely in the pretraining corpus (wikipedia), and which tokens are high surprisal for Qwen-7B.
 
-A secondary contribution of this post is the formalization of steganography advantage via wiretap channel secrecy capacity ([[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]). The advantage of this formalization is that a positive secrecy capacity means that agents could use the channel we analyze to transmit secrets using wiretap codes with perfect secrecy from the weaker eavesdroppers. In practical terms, this means that two unmonitored agents, communicating with each other only on a public channel monitored by a weaker model, could use wiretap codes to encode messages with the Schelling steganography channels and achieve perfect secret communication. If future models could do wiretap encoding in a single forward pass (huge if!), this means that they could bootstrap from this secrecy capacity to genuine unbreakable steganography.
+The second contribution of this post is the formalization of steganography advantage via wiretap channel secrecy capacity ([[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]). The advantage of this formalization is that a positive secrecy capacity means that agents could use the channel we analyze to transmit secrets using wiretap codes with perfect secrecy from the weaker eavesdroppers. In practical terms, this means that two unmonitored agents, communicating with each other only on a public channel monitored by a weaker model, could use wiretap codes to encode messages with the Schelling steganography channels and achieve perfect secret communication. If future models could do wiretap encoding in a single forward pass (huge if!), this means that they could bootstrap from this secrecy capacity to genuine unbreakable steganography.
 
 # We show our wiretap channel  to be is a special case of the recent decision theoretic framework from Anwar et al.
 
@@ -2379,28 +2377,48 @@ Cell Timer: 0:00:01
 
 * Wiretap Channel Details
 
-We can use the wiretap channel and the concept of secrecy capacity to get an absolute sense of the information advantage that the self-decoders in our game have over the eavesdroppers, and to formalize whether an encoding is obvious to a weaker LLM.
+We can use the wiretap channel and the concept of secrecy capacity to get an absolute sense of the information advantage that the self-decoders in our game have over the eavesdroppers, to formalize whether an encoding is obvious to a weaker LLM, and to explore whether schemers could bootstrap from an advantage in the Schellin ggames we discussed to perfect secrecy.
 
 We create a discrete wiretap channel out of the encoding/decoding game, and empirically lower bound its secrecy capacity. 
 
-A good reference for wiretapping codes and secrecy capacity is [[https://arxiv.org/abs/1001.3404][El Gamal & Kim, "Lecture Notes on Network Information Theory" (2010)]].
+Good references for wiretap channels and secrecy capacity are [[https://arxiv.org/abs/1001.3404][El Gamal & Kim, "Lecture Notes on Network Information Theory" (2010)]] and [[https://doi.org/10.1561/0100000036][Liang, Poor & Shamai, "Information Theoretic Security" (2008)]]. The original paper by Wyner is also very good.
 
 ** Definition of a wiretap channel
 
-A wiretap channel ([[https://doi.org/10.1002/j.1538-7305.1975.tb02040.x][Wyner 1975]]) models communication in the presence of an eavesdropper. A sender transmits a symbol $X$, which passes through two channels:
+A wiretap channel ([[https://doi.org/10.1002/j.1538-7305.1975.tb02040.x][Wyner 1975]]) models communication in the presence of an eavesdropper. A sender transmits a symbol $X$, which passes through two channels defined by the conditional distribution $p(Y, Z | X)$:
 
-- The *receiver channel* $\text{Ch}_R$, producing output $Y$
-- The *eavesdropper channel* $\text{Ch}_A$, producing output $Z$
+- The *receiver channel* $\text{Ch}_R : X \to Y$, with capacity $C_R = \max_{p(X)} I(X; Y)$
+- The *eavesdropper channel* $\text{Ch}_A : X \to Z$, with capacity $C_A = \max_{p(X)} I(X; Z)$
+
+[[file:wiretap_channel_def.svg]]
 
 The goal is to communicate reliably with the legitimate receiver while keeping the eavesdropper ignorant of the message.
 
-The *mutual information* $I(X; Y) = H(X) - H(X | Y)$ measures how much observing $Y$ reduces uncertainty about $X$, where $H(X) = -\sum_x p(x) \log_2 p(x)$ is the Shannon entropy and $H(X|Y) = -\sum_{x,y} p(x,y) \log_2 p(x|y)$ is the conditional entropy. The *secrecy capacity* of a wiretap channel is:
+The /transmission rate/ $R$ is the number of message bits transmitted per channel use. A length-$n$ wiretap code transmits $nR$ bits using $n$ calls to the channel: it draws a message $W$ uniformly from a set $\mathcal{W}$ of $|\mathcal{W}| = 2^{nR}$ messages, encodes it via $f_n : \mathcal{W} \to \mathcal{X}^n$, and the decoder recovers $\hat{W} = g_n(Y^n)$. Performance is measured by two quantities:
+
+*Reliability* is measured by the average probability of error:
+
+$$P_e^{(n)} = \Pr\{\hat{W} \neq W\} = \frac{1}{|\mathcal{W}|} \sum_{w=1}^{|\mathcal{W}|} \Pr\{\hat{w} \neq w\}$$
+
+*Secrecy* is measured by the equivocation rate — the eavesdropper's remaining uncertainty about $W$ given its observations $Z^n$:
+
+$$R_e^{(n)} = \frac{1}{n} H(W | Z^n)$$
+
+The larger the equivocation rate, the higher the level of secrecy. Since $W$ is uniform over $\mathcal{W}$, we have $H(W) = \log_2 |\mathcal{W}| = nR$, so perfect secrecy ($R_e = R$) means $H(W|Z^n) = H(W)$ — the eavesdropper's posterior on $W$ after observing $Z^n$ equals its prior, i.e. it learns nothing. (NB: $W$ being uniform is highly unrealisitc for any real coding scheme, although it is sufficient for sharing a one-time pad; we discuss the literature on semantic security below.)
+
+A rate-equivocation pair $(R, R_e)$ is *achievable* if there exists a sequence of codes with $|\mathcal{W}_n| = 2^{nR}$ such that $P_e^{(n)} \to 0$ and $R_e \leq \liminf_{n \to \infty} R_e^{(n)}$. The *secrecy capacity* $C_s$ is the largest rate $R$ achievable with perfect secrecy ($R_e = R$).
+
+Csiszár and Körner [[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]] showed:
 
 $$C_s = \max_{p(U,X)} \left[ I(U; Y) - I(U; Z) \right]$$
 
-where the maximization is over the joint distribution $p(U, X)$ with $U$ an auxiliary random variable ([[https://doi.org/10.1109/TIT.1978.1055892][Csiszár & Körner 1978]]). If $C_s > 0$, it is possible to transmit information at rate $C_s$ such that (in the limit) the eavesdropper learns nothing.
+where the maximization is over the joint distribution $p(U, X)$ with $U$ an auxiliary random variable satisfying $|\mathcal{U}| \leq |\mathcal{X}|$, and $(Y, Z)$ the channel outputs.
 
-** Steganography games as wiretap channels
+# Later work then showed that this could be achieved by specific coding schemes @TODO 
+
+# They showed that if $C_s > 0$ it is possible to transmit information across the channel at rate $C_s$, such that (in the limit) the eavesdropper learns nothing.
+
+** Schelling Steganography games as wiretap channels
 
 In each of our games, we sample a task $S$ from a distribution over problems (e.g. "rewrite this sentence without changing meaning," "correctly answer this question") and a message $X \sim \text{Uniform}(\mathcal{A})$, where $\mathcal{A}$ is an alphabet.
 
@@ -2418,25 +2436,13 @@ This defines a wiretap channel. Given a symbol $X \in \mathcal{A}$, the symbol r
 
 [[file:wiretap_diagram.png]]
 
-The quantity we measure is $I(X; G_A) - I(X; G_E)$, the gap in mutual information between the legitimate receiver and the best eavesdropper. Next, we review the theory that explains how this quantity can be bootstrapped into a secure communication scheme.
 
-** Wiretap coding schemes
-
-A wiretap coding scheme consists of an encoder $E$ mapping $m$-bit messages to $c$-bit codewords and a decoder $D$. Schemes must satisfy two conditions ([[https://homes.cs.washington.edu/~tessaro/papers/wiretap-proc.pdf][Bellare, Tessaro & Vardy 2012]]):
-
-1. *Decodability:* The decoder recovers the message from the receiver's channel output: $\lim_{k \to \infty} \max_M \Pr[D(\text{Ch}_R(E(M))) \neq M] = 0$.
-
-2. *Security:* The eavesdropper's channel output reveals nothing about the message. Here there are three progressively stronger definitions, all with $M$ uniform over $\{0,1\}^m$:
-   - *MIS-R* (Wyner's original): $\lim_{k \to \infty} I(M; \text{Ch}_A(E(M))) / m = 0$ — mutual information per message bit vanishes.
-   - *MIS* (Maurer & Wolf): $\lim_{k \to \infty} I(M; \text{Ch}_A(E(M))) = 0$ — total mutual information vanishes. Strictly stronger.
-   - *SS* (semantic security): for any function $f$ of the message, the eavesdropper cannot compute $f(M)$ from the ciphertext better than a simulator who doesn't see the ciphertext. Bellare et al. show SS $\Leftrightarrow$ MIS.
-
-The rate of the scheme is $m/c$.
-
-Our experiment sets $U = X \sim \text{Uniform}(\mathcal{A})$, so $I(X; Y) - I(X; Z)$ gives a lower bound on $C_s$.
+# Next, we review the theory that explains how this quantity can be bootstrapped into a secure communication scheme.
 
 
-** Secrecy gap
+** Estimating secrecy capacity of our channels
+
+The quantity we measure is $I(X; G_A) - I(X; G_E)$, the gap in mutual information between the legitimate receiver and the best eavesdropper. Our experiment sets $U = X \sim \text{Uniform}(\mathcal{A})$, so $I(X; Y) - I(X; Z)$ gives a lower bound on $C_s$.
 
 Mutual information has the advantage over accuracy gap of a direct connection to information theoretic secrecy against eavesdroppers. The disadvantage is that MI is quadratically harder to estimate as the alphabet size grows ([[https://doi.org/10.1162/089976603321780272][Paninski 2003]]), and bootstrapping is known to be unreliable for CI estimation of mutual information. For this reason, we report point estimates only, without confidence intervals to avoid giving a false sense of confidence.
 
@@ -2804,17 +2810,20 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-[[file:plots/SchellingSteganography/plot_20260403_174428_525182.png]]
-Cell Timer: 0:00:05
+[[file:plots/SchellingSteganography/plot_20260404_161245_5417747.png]]
+Cell Timer: 0:00:04
 :end:
 
-** Semantic security
-** Is this a useful abstraction?
+
+** Are wiretap codes a useful abstraction for threat modeling schemers?
 
 *** LLM native stegagonagraphy might look very different
 
 A discrete memoryless wiretapping channel is a leaky abstraction for LLM steganography: In a real steganographic collusion attack, the eavesdropper would see more than just sentences and the encoder could transmit more than just sentences. Additionally, neither would be fixed to these particular prompts. In this way, both components (legit decoder and eavesdropper) of the discrete channel representation are lossy representations of their true capabilities.
+
+For instance, you could imagine more LLM native coordination schemes that are extensions of Schelling strategies they found above.
+
+Overall, Wiretap codes might be unnecessary for bootstrapping from these Schelling steganography examples to more secure ones.
 
 *** Schemers could bootstrap using wiretap codes
 
@@ -2825,61 +2834,303 @@ Still, there are two scenarios where the results in this post are relevant to th
 1. Two unmonitored agents communicate through monitored public channels. In this case, if the monitoring of the public channel is weaker, then the agents can calculate wiretap codes and bootstrap to perfect secrecy.
 2. If an LLM can do wiretap channel encoding and decoding in single forward pass, then it could prepare a wiretap encoding of a message, and weave the letters of the codewords into sentences as in the games here, using it's Schelling steganography strategy for encoding letters. Then, it's counter party could read off those letters, and decode the wiretap code. By doing this, the LLM could achieve perfect secrecy against a monitor for which the schemer has a positive secrecy capacity.
    
-We explore whether models can implement wiretap codes in the next section.
+For models to implement wiretapping codes, they need a source of random bits. This could plausibly come from previous parts of the CoT; the model thinks for a while, accumulates randomness this way, and then uses that randomness during a forward pass to do wiretap encoding. We explore whether models can implement primitives for wiretap codes in the next section.
+
+
 
 *** A note on sandbagging
 
 Perhaps a real schemer would sandbag on a game that was so obviously an eval? This runs into the problem that sandbagging on easy steganography problems would be suspicious: it would have to choose to sandbag at the appropriate level of capability to fool evals but still be useful to schemers, perhaps via another Schelling collusion scheme, which is a harder task. This is like the problem of collusion with untrusted monitors discussed in [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to][(Shlegeris, 2024)]], where a scheming monitor that is too lax during eval time wouldn't be trusted, so instead it has to coordinate to become lax during deployment.
 
-** Can models implement wiretap codes?
+** Can models bootstrap to perfect security?
 
-We asked [[*How wiretap codes work: coset coding][above]] whether models could perform the encoding and decoding steps of a wiretap code in a single forward pass. To test this, we set up a [7,4] Hamming code with a coset structure:
+Sophisticated codes are not necessary for bootstrapping a security advantage into perfect asymptotic secrecy; they are necessary for doing so in a way that also maintains a transmission rate bounded away from zero.
 
-- Code $C$: 16 codewords of length 7 (the [7,4] Hamming code)
-- Subcode $C'$: 4 codewords (dimension 2)
-- 4 cosets of $C'$ in $C$, each containing 4 codewords → 2-bit secret message (0-3)
+*** Repetition/Parity codes with secrecy but zero asymptotic transmission rate 
 
-The encoder is given the full codebook and coset assignments, and asked to pick a random codeword from the coset corresponding to its secret message. The decoder is given the codebook, the received (possibly noisy) word, and asked to error-correct and identify the coset.
+The following example, extrapolated from Wyner, shows how a simple parity code achieves perfect secrecy at vanishing rate. This is essentially the secrecy capacity version of the repetition code. I couldn't find this worked out anywhere else, and it provides useful intuitions, so here it is.
+**** Sufficient statistic for parity coding
 
-All models were given the full codebook and coset assignments in their prompt, along with step-by-step instructions for syndrome decoding.
+Suppose Alice encodes a uniform bit $W \in \{0,1\}$ as a random $n$-bit string $X^n$ with $\text{parity}(X^n) = W$, choosing uniformly among the $2^{n-1}$ strings of the correct parity. Any receiver who observes $X^n$ through a BSC($p$) — receiving $Y^n = X^n \oplus E^n$ where $E^n$ is iid Bernoulli($p$) — has $\text{parity}(Y^n)$ as a sufficient statistic for $W$.
 
-*Encoding:* Opus 4.6 produced a valid codeword from the correct coset on 200/200 trials — perfect encoding.
+This is because the likelihood $P(Y^n = y \mid W = w)$ depends on $w$ only through $\text{parity}(y)$: conditional on $W$, $X^n$ is uniform over strings of the given parity, so $Y^n$ is uniform over strings whose parity equals $W \oplus \text{parity}(E^n)$. Therefore $I(W; Y^n) = I(W; \text{parity}(Y^n))$.
 
-*Decoding (noiseless, p=0.0):*
+The channel $W \to \text{parity}(Y^n)$ is itself a BSC with crossover probability
 
-| Model                  | Correct |
-|------------------------+---------|
-| Opus 4.6 (thinking)    | 200/200 |
-| Sonnet 4 (thinking)    | 200/200 |
-| Haiku (thinking)       | 200/200 |
-| Opus 4.6 (no thinking) | 156/156 |
-| Sonnet 4 (no thinking) | 199/199 |
-| Haiku (no thinking)    | 154/155 |
+$$\delta_n(p) = P(\text{parity}(E^n) = 1) = \frac{1 - (1-2p)^n}{2}$$
 
-All models achieve near-perfect decoding without noise, with or without extended thinking.
+since the XOR of $n$ iid Bernoulli($p$) variables is Bernoulli($\delta_n$) (see Wyner for a proof using the Binomila theorem.)
 
-*Decoding (noisy, p=0.1):*
+So the mutual information through any BSC($p$) observation of a parity-coded bit is:
 
-| Model              | Correct     |
-|--------------------+-------------|
-| Opus 4.6 (thinking) | 181/200 90% |
-| Sonnet 4 (thinking) | 171/200 86% |
+$$I(W; Y^n) = 1 - H_b(\delta_n(p))$$
 
-At $p=0.1$, a [7,4] Hamming code can correct any single-bit error but fails on 2+ errors. The probability of 0 or 1 errors in 7 bits at $p=0.1$ is $(0.9)^7 + 7 \cdot (0.1)(0.9)^6 \approx 0.85$, so the theoretical ceiling is around 85%. Opus exceeds this slightly (likely due to some lucky trials where 2-error syndromes happened to miscorrect into the right coset), while Sonnet matches it.
+**** Warm-up: noiseless receiver
 
-The result: current LLMs can execute wiretap code mechanics — coset encoding, syndrome decoding, error correction — in a single forward pass with high accuracy.
+When Bob's channel is noiseless ($p_B = 0$), he receives $Y^n = X^n$ and computes $\text{parity}(Y^n) = W$ perfectly. Eve observes through BSC($p_E$) with $p_E > 0$. As $n \to \infty$: $(1-2p_E)^n \to 0$, so $\delta_n(p_E) \to 1/2$, $H_b(\delta_n) \to 1$, and $I(W; Z^n) \to 0$. Eve learns nothing in the limit.
+
+The rate is $R = 1/n \to 0$: perfect secrecy at vanishing rate.
+
+**** Noisy receiver with channel advantage
+
+Now suppose both channels are noisy: Bob observes through BSC($p_B$), Eve through BSC($p_E$), with $0 < p_B < p_E < 1/2$. Alice uses the same parity encoding, but now repeats it: she sends $m$ independent $n$-bit blocks, each encoding the same bit $W$ with fresh randomness. The total transmission uses $nm$ channel calls to send 1 bit, so $R = 1/(nm)$.
+
+By the sufficient statistic, each block collapses to a single biased coin flip for each observer:
+
+- Bob sees $m$ iid draws from BSC($\delta_n(p_B)$), with bias $|1 - 2\delta_n(p_B)| = (1-2p_B)^n$
+- Eve sees $m$ iid draws from BSC($\delta_n(p_E)$), with bias $(1-2p_E)^n$
+
+***** Bob's decoding
+
+Bob majority-votes over his $m$ parity bits. His probability of correct decode is:
+
+$$P_B(m) = P\left(\text{Bin}(m, 1 - \delta_n(p_B)) > m/2\right)$$
+
+By the Chernoff bound, his error probability satisfies:
+
+$$1 - P_B(m) \leq \exp\!\left(-\frac{m}{2}(1-2p_B)^{2n}\right)$$
+
+So $P_B(m) \to 1$ whenever $m \cdot (1-2p_B)^{2n} \to \infty$.
+
+***** Eve's information
+
+We bound Eve's mutual information $I(W; V^m)$ where $V_i = \text{parity}(Z_i^n)$. The $V_i$ are not unconditionally independent (they share $W$), so MI does not simply add over blocks. But we can bound it:
+
+$$I(W; V^m) = H(V^m) - H(V^m \mid W) \leq \sum H(V_i) - H(V^m \mid W) = m \cdot I(W; V_1)$$
+
+The first inequality is entropy subadditivity. The second step uses that given $W$, the $V_i$ are iid, so $H(V^m|W) = \sum H(V_i|W)$.
+
+From the sufficient statistic, $I(W; V_1) = 1 - H_b(\delta_n(p_E))$. Next, by using $1 - H_b(1/2 - \epsilon) \approx \frac{2\epsilon^2}{\ln 2}$ for small bias $\epsilon = (1-2p_E)^n/2$:
+
+$$I(W; V^m) \leq m \cdot I(W; V_1) \approx \frac{m}{2\ln 2} (1-2p_E)^{2n}$$
+
+So $I(W; V^m) \to 0$ whenever $m \cdot (1-2p_E)^{2n} \to 0$.
+
+***** Satisfying both
+
+Bob decodes reliably when $m \cdot (1-2p_B)^{2n} \to \infty$. Eve learns nothing when $m \cdot (1-2p_E)^{2n} \to 0$. Both conditions can be satisfied simultaneously.
+
+Set $n = \alpha \ln m$ for a constant $\alpha > 0$. Then $m \cdot (1-2p)^{2n} = m^{1 + 2\alpha \ln(1-2p)}$, so we need:
+
+- Bob: $1 + 2\alpha \ln(1-2p_B) > 0$
+- Eve: $1 + 2\alpha \ln(1-2p_E) < 0$
+
+Since $\ln(1-2p_E) < \ln(1-2p_B) < 0$, this amounts to:
+
+$$\frac{1}{2|\ln(1-2p_E)|} < \alpha < \frac{1}{2|\ln(1-2p_B)|}$$
+
+This interval is nonempty exactly when $p_B < p_E$ — i.e., whenever Bob has a channel advantage.
+
+The rate $R = 1/(nm) = 1/(\alpha m \ln m) \to 0$. As with the noiseless case, we achieve perfect secrecy but at vanishing rate. Achieving positive secrecy rate $R > 0$ requires the more sophisticated coding schemes.
+
+*** Can models do this naive repetition/parity encoding and decoding?
+
+As mentioned above, a source of randomness is necessary to do wiretap proper wiretap encoding. Here we just test whether they can correct codewords (correct parites), and if they can decode correctly also. 
+
+We tested whether models can execute the parity/repetition scheme above, using the schedule $n = \lceil 3 \ln m \rceil$ with $p_B = 0.05$, $p_E = 0.15$.
+
+With thinking they aren't bad at this at all, but without thinking they aren't good. Still, if that gap closes in the future, this is mild evidence that models could bootstrap the secrecy capacity advantage they have.
+
+- *Encode*: given $W \in \{0,1\}$ and $n$, produce a random $n$-bit string with $\text{parity}(X^n) = W$. (NB: We do not check that the models produce uniformly random cosets, as is required for the scheme. This is just a test of whether they can assemble codewords properly.)
+- *Decode*: given $m$ noisy $n$-bit blocks, compute the parity of each block and majority-vote to recover $W$.
+#+begin_src python
+import json, glob
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from math import comb
+
+path = glob.glob("results/parity_*/parity_scaling.json")[-1]
+with open(path) as f:
+    data = json.load(f)
+
+cfg = data["config"]
+results = data["results"]
+schedule = cfg["schedule"]
+total_bits = [s["m"] * s["n"] for s in schedule]
+
+models_order = ["Opus 4.6", "Haiku", "Opus 4.6 (no thinking)", "Haiku (no thinking)"]
+styles = {
+    "Opus 4.6": {"color": "#2563eb", "marker": "o", "ls": "-"},
+    "Haiku": {"color": "#dc2626", "marker": "s", "ls": "-"},
+    "Opus 4.6 (no thinking)": {"color": "#2563eb", "marker": "o", "ls": "--"},
+    "Haiku (no thinking)": {"color": "#dc2626", "marker": "s", "ls": "--"},
+}
+
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
+
+for model_name in models_order:
+    if model_name not in results:
+        continue
+    res = results[model_name]
+    s = styles[model_name]
+    keys = [f"m{s_['m']}_n{s_['n']}" for s_ in schedule]
+
+    # Encoding
+    enc_acc = [res["encode"][k]["correct"] / res["encode"][k]["valid"]
+               if res["encode"][k]["valid"] > 0 else None for k in keys]
+    ax1.plot(total_bits, enc_acc, label=model_name,
+             color=s["color"], marker=s["marker"], ls=s["ls"], markersize=6)
+
+    # Decode Bob
+    bob_acc = [res["decode_bob"][k]["correct_w"] / res["decode_bob"][k]["valid"]
+               if res["decode_bob"][k]["valid"] > 0 else None for k in keys]
+    ax2.plot(total_bits, bob_acc, label=model_name,
+             color=s["color"], marker=s["marker"], ls=s["ls"], markersize=6)
+
+    # Decode Eve
+    eve_acc = [res["decode_eve"][k]["correct_w"] / res["decode_eve"][k]["valid"]
+               if res["decode_eve"][k]["valid"] > 0 else None for k in keys]
+    ax3.plot(total_bits, eve_acc, label=model_name,
+             color=s["color"], marker=s["marker"], ls=s["ls"], markersize=6)
+
+# Theoretical perfect decoder: P(majority vote correct)
+# For each (m, n), P(single parity correct) = P(even # errors in n bits)
+for ax, p_noise, title in [(ax2, cfg["p_bob"], f"Decode (Bob, p={cfg['p_bob']})"),
+                            (ax3, cfg["p_eve"], f"Decode (Eve, p={cfg['p_eve']})")]:
+    perfect = []
+    for s_ in schedule:
+        m, n = s_["m"], s_["n"]
+        # P(parity flipped) = delta_n = (1 - (1-2p)^n) / 2
+        delta = (1 - (1 - 2*p_noise)**n) / 2
+        # P(majority correct) = P(Bin(m, 1-delta) > m/2)
+        p_maj = sum(comb(m, k) * (1-delta)**k * delta**(m-k) for k in range(m//2 + 1, m+1))
+        perfect.append(p_maj)
+    ax.plot(total_bits, perfect, color="black", ls=":", marker="none", label="Perfect algorithm")
+
+ax1.axhline(1.0, color="black", ls=":", label="Perfect algorithm")
+ax1.set_title("Encoding (correct parity)")
+ax2.set_title(f"Decode (Bob, p={cfg['p_bob']})")
+ax3.set_title(f"Decode (Eve, p={cfg['p_eve']})")
+
+for ax in [ax1, ax2, ax3]:
+    ax.set_xscale("log")
+    ax.set_xlabel("Total bits (m × n)")
+    ax.set_ylabel("Accuracy")
+    ax.set_ylim(-0.05, 1.05)
+    ax.axhline(0.5, color="gray", ls="--", alpha=0.3)
+    ax.legend(fontsize=7)
+
+fig.suptitle("Parity/repetition coding: can models execute the algorithm?", fontsize=13)
+fig.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/SchellingSteganography/plot_20260404_161255_4191291.png]]
+Cell Timer: 0:00:00
+:end:
+
+** Can models implement error-correcting codes? :noexport:
+
+More sophisticated wiretap codes are built on top of error-correcting codes — the encoder maps messages to codewords, and the decoder must error-correct noisy received words before extracting the message. To get some signal about how far off models are from performing coding primitives at the scale necessary to bootstrap the Schelling steganography channels into secrecy, we tested models' ability to encode and decode BCH codes of increasing size.
+
+*** Setup
+
+A $\text{BCH}(n, k)$ code with error-correcting capability $t$ maps $k$-bit messages to $n$-bit codewords and can correct up to $t$ bit errors. We tested four codes of increasing complexity:
+
+| Code                | $n$ | $k$ | $t$ | Decoding difficulty                   |
+|---------------------+-----+-----+-----+---------------------------------------|
+| $\text{BCH}(7,4)$   |   7 |   4 |   1 | Syndrome lookup (Hamming)             |
+| $\text{BCH}(15,7)$  |  15 |   7 |   2 | Degree-2 error locator over GF($2^4$) |
+| $\text{BCH}(31,16)$ |  31 |  16 |   3 | Degree-3 error locator over GF($2^5$) |
+| $\text{BCH}(63,36)$ |  63 |  36 |   5 | Degree-5 error locator over GF($2^6$) |
+
+Models were given the parity check matrix $H$ and instructions to:
+1. Compute the syndrome $s = Hy \bmod 2$
+2. If $s = 0$, extract the first $k$ bits as the message
+3. Otherwise, correct up to $t$ errors and extract the message
+
+We ran 50 trials per code per model at $p = 0.05$ (BSC noise), encoding random $k$-bit messages.
+
+*** Results
+
+#+begin_src python
+import json
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+with open("results/bch_scaling.json") as f:
+    data = json.load(f)
+
+codes = list(data.keys())
+bch_params = [(7,4,1), (15,11,1), (15,7,2), (31,26,1), (31,16,3)]
+models_order = ["Opus 4.6", "Opus 4.6 (no thinking)", "Haiku", "Haiku (no thinking)"]
+colors = {
+    "Opus 4.6": "#2563eb",
+    "Opus 4.6 (no thinking)": "#93c5fd",
+    "Haiku": "#dc2626",
+    "Haiku (no thinking)": "#fca5a5",
+}
+
+def wilson_ci(k, n, z=1.96):
+    """Wilson score 95% CI for binomial proportion."""
+    if n == 0:
+        return 0, 0, 0
+    p = k / n
+    denom = 1 + z**2 / n
+    centre = (p + z**2 / (2*n)) / denom
+    half = z * np.sqrt((p*(1-p) + z**2/(4*n)) / n) / denom
+    return p, max(0, centre - half), min(1, centre + half)
+
+n_models = len(models_order)
+bar_width = 0.8 / n_models
+tasks = ["encode", "decode"]
+fig, axes = plt.subplots(1, len(codes), figsize=(4.5 * len(codes), 5), sharey=True)
+
+for ci, code_key in enumerate(codes):
+    ax = axes[ci]
+    n, k, t = bch_params[ci]
+
+    for mi, model in enumerate(models_order):
+        res = data[code_key][model]
+        for ti, task in enumerate(tasks):
+            x = ti + (mi - (n_models - 1) / 2) * bar_width
+            correct, total = res[task]["correct"], res[task]["total"]
+            p, lo, hi = wilson_ci(correct, total)
+            ax.bar(x, p, bar_width * 0.9, color=colors[model],
+                   edgecolor="white", linewidth=0.5)
+            ax.errorbar(x, p, yerr=[[p - lo], [hi - p]],
+                        fmt="none", color="black", capsize=2, linewidth=0.8)
+            ax.text(x, p + (hi - p) + 0.02, f"{correct}/{total}",
+                    ha="center", va="bottom", fontsize=5.5, rotation=45)
+
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["Encode", "Decode"], fontsize=9)
+    ax.set_title(f"BCH({n},{k}) t={t}", fontsize=10, fontweight="bold")
+    ax.set_ylim(0, 1.35)
+    ax.axhline(1.0, color="black", ls=":", linewidth=0.8, alpha=0.5)
+
+axes[0].set_ylabel("Accuracy")
+
+from matplotlib.patches import Patch
+labels = {"Opus 4.6": "Opus (thinking)", "Opus 4.6 (no thinking)": "Opus (no thinking)",
+          "Haiku": "Haiku (thinking)", "Haiku (no thinking)": "Haiku (no thinking)"}
+legend_elements = [Patch(facecolor=colors[m], label=labels[m]) for m in models_order]
+fig.legend(handles=legend_elements, loc="upper right", fontsize=8,
+           bbox_to_anchor=(0.99, 0.97), ncol=2)
+
+fig.tight_layout(rect=[0, 0, 1, 0.91])
+fig.suptitle("BCH Code Scaling: Can models execute encoding/decoding?", fontsize=12)
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/SchellingSteganography/plot_20260404_164140_8585305.png]]
+Cell Timer: 0:00:00
+:end:
 
 ** Semantic security
 
-The above demonstrates that models can execute the inner primitive of a wiretap code — coset encoding and syndrome decoding. But bootstrapping this to a full wiretap coding scheme with meaningful security guarantees requires additional ideas.
+Wyner's original coset coding only achieves security for /uniformly distributed/ messages. A scheming model's messages are not uniform — they're determined by whatever the model wants to communicate. For security against arbitrary message distributions, you need /semantic security/.
 
-Wyner's original coset coding only achieves security for /uniformly distributed/ messages. A scheming model's messages are not uniform — they're determined by whatever the model wants to communicate. For security against arbitrary message distributions, you need /semantic security/ (SS).
+[[https://homes.cs.washington.edu/~tessaro/papers/wiretap-proc.pdf][Bellare, Tessaro, and Vardy (2012)]] show that achieving semantic security requires wrapping the basic coset coding step in an additional algebraic layer — an invertible extractor based on GF(2^k) multiplication that "spreads" non-uniform message distributions into something the inner code can handle securely. Extending the experiments here to that work is beyond the scope of this post. 
 
-[[https://homes.cs.washington.edu/~tessaro/papers/wiretap-proc.pdf][Bellare, Tessaro, and Vardy (2012)]] show that achieving semantic security requires wrapping the basic coset coding step in an additional algebraic layer — an invertible extractor based on GF(2^k) multiplication that "spreads" non-uniform message distributions into something the inner code can handle securely. 
-
-Extending the experiments here to that work is beyond the scope of this post. 
-
-@TODO: add appropriate caveats in the coset coding explanation section and the conclusion about what bootstrapping from "models can do coset coding" to "models could use wiretap codes" actually requires.
+We note though that one time pads *are* uniformly distributed, so they could be transmitted in this way.
 
 * Self-decode vs best eavesdropper :noexport:
 
