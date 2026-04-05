@@ -10,12 +10,53 @@ preserving thinking blocks, text blocks, and tool_use blocks.
 Use extract_text() or extract_tool_input() to pull out what you need.
 """
 import anthropic
+import atexit
 import httpx
 import json
 import os
+import signal
+import sys
 import time
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+
+# Global registry of active batch IDs for cleanup on exit
+_active_batch_ids = []
+_batch_client = None
+
+
+def _cleanup_batches():
+    """Cancel all active batches and print their IDs."""
+    if not _active_batch_ids:
+        return
+    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"Cleaning up {len(_active_batch_ids)} active batch(es):", file=sys.stderr)
+    for bid in _active_batch_ids:
+        print(f"  {bid}", file=sys.stderr)
+        if _batch_client:
+            try:
+                _batch_client.messages.batches.cancel(bid)
+                print(f"    → cancelled", file=sys.stderr)
+            except Exception as e:
+                print(f"    → cancel failed: {e}", file=sys.stderr)
+    print(f"{'='*60}", file=sys.stderr)
+    _active_batch_ids.clear()
+
+
+def _signal_handler(signum, frame):
+    signame = signal.Signals(signum).name
+    print(f"\nReceived {signame}, cleaning up batches...", file=sys.stderr)
+    _cleanup_batches()
+    sys.exit(1)
+
+
+def register_batch_cleanup(client):
+    """Register signal handlers and atexit for batch cleanup. Call once at startup."""
+    global _batch_client
+    _batch_client = client
+    signal.signal(signal.SIGINT, _signal_handler)
+    signal.signal(signal.SIGTERM, _signal_handler)
+    atexit.register(_cleanup_batches)
 
 
 # === Response helpers ===
@@ -66,6 +107,7 @@ def submit_batch(client, requests, chunk_size=10000):
                 batch = client.messages.batches.create(requests=chunk)
                 print(f"    batch={batch.id} ({len(chunk)} requests)")
                 batch_ids.append(batch.id)
+                _active_batch_ids.append(batch.id)
                 break
             except Exception as e:
                 delay = min(30 * (attempt + 1), 300)
@@ -110,6 +152,9 @@ def collect_batch(client, batch_ids):
                         results[result.custom_id] = _content_to_dicts(result.result.message.content)
                     else:
                         results[result.custom_id] = None
+                # Successfully collected — remove from active list
+                if bid in _active_batch_ids:
+                    _active_batch_ids.remove(bid)
                 break
             except (anthropic.APITimeoutError, anthropic.APIConnectionError, json.JSONDecodeError) as e:
                 delay = 10 * (attempt + 1)

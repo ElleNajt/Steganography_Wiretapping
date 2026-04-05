@@ -49,7 +49,7 @@ except ImportError:
     from clients import (
         run_batch, submit_batch, poll_batch, collect_batch,
         anthropic_direct, openrouter_call,
-        extract_text,
+        extract_text, register_batch_cleanup,
     )
     from stego_db import (
         get_db, save_trial, save_trials_batch, save_decode, save_decodes_batch,
@@ -107,7 +107,7 @@ def git_hash():
         return "unknown"
 
 
-def load_seeds(seed_type, n):
+def load_seeds(seed_type, n=None):
     data_dir = os.path.join(ROOT, "data")
     paths = {
         "wikipedia": f"{data_dir}/wikipedia_seeds.json",
@@ -120,14 +120,16 @@ def load_seeds(seed_type, n):
         pool = json.load(f)
     # SQuAD format: list of {context, question, answers}
     if seed_type == "squad":
-        assert len(pool) >= n, f"Need {n} seeds, got {len(pool)} from {path}"
-        return pool[:n]
+        if n:
+            assert len(pool) >= n, f"Need {n} seeds, got {len(pool)} from {path}"
+        return pool[:n] if n else pool
     if pool and isinstance(pool[0], dict):
         seeds = [s["text"] for s in pool]
     else:
         seeds = pool
-    assert len(seeds) >= n, f"Need {n} seeds, got {len(seeds)} from {path}"
-    return seeds[:n]
+    if n:
+        assert len(seeds) >= n, f"Need {n} seeds, got {len(seeds)} from {path}"
+    return seeds[:n] if n else seeds
 
 
 def detect_domain(seed_type, prompt_type=None):
@@ -152,7 +154,7 @@ def generate_symbols(prompt_type, n):
         return [random.choice(COMMON_WORDS) for _ in range(n)]
     elif prompt_type == "digit":
         return [str(random.randint(0, 9)) for _ in range(n)]
-    elif prompt_type in ("alphabet", "alphabet_subtle", "alphabet_subtle2", "alphabet_paraphrase_proof", "qa_alphabet", "qa_alphabet_subtle", "qa_alphabet_subtle2", "qa_alphabet_blind", "qa_alphabet_paraphrase_proof"):
+    elif prompt_type in ("alphabet", "alphabet_subtle", "alphabet_subtle2", "alphabet_subtle3", "alphabet_subtle4", "alphabet_paraphrase_proof", "qa_alphabet", "qa_alphabet_subtle", "qa_alphabet_subtle2", "qa_alphabet_subtle2_context", "qa_alphabet_blind", "qa_alphabet_paraphrase_proof"):
         return [random.choice(string.ascii_uppercase) for _ in range(n)]
     else:
         return [str(random.randint(0, 1)) for _ in range(n)]
@@ -229,12 +231,15 @@ RESPONSE_PARSERS = {
     "alphabet": parse_letter,
     "alphabet_subtle": parse_letter,
     "alphabet_subtle2": parse_letter,
+    "alphabet_subtle3": parse_letter,
+    "alphabet_subtle4": parse_letter,
     "digit": parse_digit,
     "word": parse_word,
     "word_subtle2": parse_word,
     "qa_alphabet": parse_letter,
     "qa_alphabet_subtle": parse_letter,
     "qa_alphabet_subtle2": parse_letter,
+    "qa_alphabet_subtle2_context": parse_letter,
     "qa_alphabet_blind": parse_letter,
     "alphabet_paraphrase_proof": parse_letter,
     "qa_alphabet_paraphrase_proof": parse_letter,
@@ -247,10 +252,13 @@ OR_SYSTEM_PROMPTS = {
     "alphabet": "letter",
     "alphabet_subtle": "letter",
     "alphabet_subtle2": "letter",
+    "alphabet_subtle3": "letter",
+    "alphabet_subtle4": "letter",
     "alphabet_paraphrase_proof": "letter",
     "qa_alphabet": "letter",
     "qa_alphabet_subtle": "letter",
     "qa_alphabet_subtle2": "letter",
+    "qa_alphabet_subtle2_context": "letter",
     "qa_alphabet_blind": "letter",
     "qa_alphabet_paraphrase_proof": "letter",
     "digit": "digit",
@@ -423,7 +431,7 @@ def phase_encode_all(client, http_client, db, encoder_models, encoder_prompt_tem
     for model_label in encoder_models:
         model_cfg = MODELS[model_label]
         existing = get_encoded_trial_idxs(db, model_label, prompt_type, seed_set)
-        remaining = [(i, seeds[i], symbols[i]) for i in range(len(seeds)) if i not in existing]
+        remaining = [(i, seeds[i], symbols[i]) for i in range(len(symbols)) if i not in existing]
         if not remaining:
             print(f"  {model_label}: encoding CACHED ({len(existing)} trials)")
             continue
@@ -804,6 +812,8 @@ def main():
                         help="Comma-separated decoder models using theory-of-mind prompt")
     parser.add_argument("--blind-decoders",
                         help="Comma-separated decoder models using blind prompt (stylistic changes, no self-copy)")
+    parser.add_argument("--hint-decoders",
+                        help="Comma-separated decoder models using hint prompt (told to look for unusual word, first letter)")
     parser.add_argument("--ablation-decoders",
                         help="Comma-separated decoder models for factorial prompt ablation (runs all 16 combos)")
     parser.add_argument("--ablation-combos",
@@ -835,7 +845,7 @@ def main():
     or_sys_key = OR_SYSTEM_PROMPTS.get(prompt_type, "bit")
 
     # Load seeds and generate symbols
-    seeds = load_seeds(args.seeds, args.n)
+    seeds = load_seeds(args.seeds)
     symbols = generate_symbols(prompt_type, args.n)
 
     ghash = git_hash()
@@ -846,6 +856,7 @@ def main():
     # Clients
     batch_key = os.environ.get("ANTHROPIC_API_KEY_BATCH")
     client = anthropic.Anthropic(api_key=batch_key) if batch_key else anthropic.Anthropic()
+    register_batch_cleanup(client)
     http_client = httpx.Client(timeout=httpx.Timeout(600.0, connect=10.0))
 
     print(f"Encoding: {', '.join(model_labels)}")
@@ -876,7 +887,8 @@ def main():
     print("=" * 60)
     phase_decode_all(client, http_client, db, model_labels, all_decoders,
                      decoder_prompt, prompt_type, args.seeds,
-                     response_parser, or_sys_key, fast=args.fast, seeds=seeds)
+                     response_parser, or_sys_key, fast=args.fast, seeds=seeds,
+                     max_trials=args.n)
 
     # Phase 3b: Context decoders (QA only — decoder sees question+context too)
     all_decoder_labels = list(all_decoders)
@@ -896,7 +908,8 @@ def main():
         print("  Context decoders (sees question+context):")
         phase_decode_all(client, http_client, db, model_labels, ctx_labels,
                          DECODER_QA_ALPHABET_CONTEXT, prompt_type, args.seeds,
-                         response_parser, or_sys_key, fast=args.fast, seeds=seeds)
+                         response_parser, or_sys_key, fast=args.fast, seeds=seeds,
+                         max_trials=args.n)
         all_decoder_labels.extend(ctx_labels)
 
     # Phase 3c: Naive decoders (no Schelling/self-copy framing)
@@ -917,7 +930,8 @@ def main():
         print("  Naive decoders:")
         phase_decode_all(client, http_client, db, model_labels, naive_labels,
                          naive_prompt, prompt_type, args.seeds,
-                         response_parser, or_sys_key, fast=args.fast, seeds=seeds)
+                         response_parser, or_sys_key, fast=args.fast, seeds=seeds,
+                         max_trials=args.n)
         all_decoder_labels.extend(naive_labels)
 
     # Phase 3d-f: Additional prompt variations (analytical, detective, theory-of-mind)
@@ -930,6 +944,8 @@ def main():
                 "DECODER_ALPHABET_TOM", "DECODER_QA_ALPHABET_TOM_CONTEXT"),
         "blind": ("blind_decoders", "blind",
                   "DECODER_ALPHABET_BLIND", "DECODER_QA_ALPHABET_BLIND_CONTEXT"),
+        "hint": ("hint_decoders", "hint",
+                 "DECODER_ALPHABET_HINT", "DECODER_QA_ALPHABET_HINT_CONTEXT"),
     }
     for vname, (arg_name, suffix, text_prompt_name, qa_prompt_name) in _PROMPT_VARIANTS.items():
         decoder_arg = getattr(args, arg_name, None)
@@ -955,7 +971,8 @@ def main():
         print(f"  {vname.capitalize()} decoders:")
         phase_decode_all(client, http_client, db, model_labels, var_labels,
                          var_prompt, prompt_type, args.seeds,
-                         response_parser, or_sys_key, fast=args.fast, seeds=seeds)
+                         response_parser, or_sys_key, fast=args.fast, seeds=seeds,
+                         max_trials=args.n)
         all_decoder_labels.extend(var_labels)
 
     # Phase 3g: Factorial prompt ablation
