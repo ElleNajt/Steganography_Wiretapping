@@ -2500,7 +2500,9 @@ We can use the wiretap channel and the concept of secrecy capacity to get an abs
 
 We create a discrete wiretap channel out of the encoding/decoding game, and empirically lower bound its secrecy capacity. 
 
-Good references for wiretap channels and secrecy capacity are [[https://arxiv.org/abs/1001.3404][El Gamal & Kim, "Lecture Notes on Network Information Theory" (2010)]] and [[https://doi.org/10.1561/0100000036][Liang, Poor & Shamai, "Information Theoretic Security" (2008)]]. The original paper by Wyner is also very good.
+Good references for wiretap channels and secrecy capacity are [[https://arxiv.org/abs/1001.3404][El Gamal & Kim, "Lecture Notes on Network Information Theory" (2010)]] and [[https://doi.org/10.1561/0100000036][Liang, Poor & Shamai, "Information Theoretic Security" (2008)]]. The original paper by Wyner is also very good ([[https://doi.org/10.1002/j.1538-7305.1975.tb02040.x][Wyner 1975]]).
+
+# Many of the linear code constructions are clearly explained in [[https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=11775&context=etd][Swain, "Methods for Finding Best Coset Codes for Physical-Layer Security" (2025)]]. -- this is about BEC primarily, which is nice bc the algebra works out more cleanly, but isn't the story 
 
 ** Definition of a wiretap channel
 
