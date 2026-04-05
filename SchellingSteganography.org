@@ -1941,7 +1941,6 @@ plt.show()
 Cell Timer: 0:00:01
 :end:
 
-@TODO 
 ** No-thinking decoder
 
 Does extended thinking (chain-of-thought) matter for decoding? We run the same decoder prompt as in the main results section above, but with thinking disabled and "Answer immediately with your best guess. Do not reason or explain." appended. We discard the small number of trials where the model reasoned anyway (response >100 characters).
