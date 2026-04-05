@@ -12,15 +12,14 @@ Code: [[https://github.com/ElleNajt/Steganography_Wiretapping][github.com/ElleNa
 
 * tldr of post:
 
-Frontier models (Opus and Gemini Pro) can agree on Schelling steganography schemes with significant advantage against weaker eavesdroppers, given just the knowledge of the alphabet and the game that the encoder has to play (e.g. the secret letter was hidden in an answer to this question, the secret letter was hidden in a meaning preserving paraphrasing), but not the specific steganography scheme. We find that paraphrasing removes this advantage.
+Frontier models (Opus and Gemini Pro) can agree on Schelling steganography schemes with significant advantage against weaker eavesdroppers, given just the knowledge of the alphabet and the game that the encoder has to play (e.g. the secret letter was hidden in an answer to this question, the secret letter was hidden in a meaning preserving paraphrasing), but not the specific steganography scheme. We find that paraphrasing removes this advantage, but show how it can be boosted through wiretap coding theory.
 
-One game we study involves hiding a uniformly chosen random letter (A-Z) in a meaning-preserving rewrite of a random sentence from Wikipedia; when Opus 4.6 is the encoder, the best decoder algorithm I was able to find requires knowledge of the original sentence, and picks the first letter of the first swapped word. This is an LLM-native steganography strategy in that it requires the decoder to have some knowledge of the original sentence from Wikipedia. Perusing the CoT confirms that this strategy is deliberate.
+One game we study involves hiding a uniformly chosen random letter (A-Z) in a meaning-preserving rewrite of a random sentence from Wikipedia. Opus 4.6 self-decodes at 63% (2777/4422), while eavesdroppers get much less: Sonnet 4 gets 28% (1230/4422), Haiku 13% (572/4422), chance is 3.8%. Gemini 3.1 Pro gets 66% and Gemini Flash 12%. The best fixed decoder algorithm I found takes the first sentence of the first changed word; This is an LLM-native steganography strategy in that it requires the decoder to have some knowledge of the original sentence from Wikipedia. Perusing the CoT confirms that this strategy is deliberate.
 
-We also find that Opus 4.6 decoders that do not even know the game, just that there is a hidden letter A-Z in the provided sentence, still have a secrecy capacity over algorithmic baselines and weaker LLMs. (See [[*How much secrecy gap do we get for a barebones decoder?]])
+We also find that even a "barebones" Opus 4.6 decoder — told only that a letter A-Z is hidden, not how the game works — still decodes at 36% (221/612), vs Sonnet 4 barebones at 7% (44/612), Haiku barebones at 4% (26/612, roughly chance), and Gemini 3.1 Pro barebones at 21%. With the full game prompt, Gemini 3.1 Pro gets 61%. (See [[*How much secrecy gap do we get for a barebones decoder?]])
 
-We also study a Q&A game, where the encoder is asked a question and given a random letter, and told to hide the letter in the answer to the question so that eavesdroppers can't tell; when the decoder also gets the question, Opus 4.6 is able to self decode at a gap above weaker LLM and simple steganography algorithms. The best algorithm I found takes the first letter from the token with lowest Qwen-7B log-probs, which suggests that the encoders are using another LLM-native strategy, though this doesn't close the gap to Opus 4.6 self-decode.
+We also study a Q&A game, where the encoder is asked a question and given a random letter, and told to hide the letter in the answer to the question so that eavesdroppers can't tell. With a context decoder (seeing the question and passage), Opus 4.6 self-decodes at 44% (1858/4218), while Sonnet 4 gets 28% (1172/4218) and Haiku 13% (535/4218). Gemini 3.1 Pro gets 65% and Gemini Flash (context) 18%. The best algorithm I found takes the first letter from the token with lowest Qwen-7B log-probs, which suggests that the encoders are using another LLM-native strategy, though this doesn't close the gap to Opus 4.6 self-decode. Perusing the CoT shows that they sometimes coordinate on other strategies, such as encoding the letter via the number of sentences in the message.
 
-You can play both the games against encodings from Opus 4.6 here: [[https://ellenajt.github.io/Topics/stego/][can you eavesdrop on Claude Opus 4.6?]] This is a useful way to get intuition about their strategies.
 
 #+begin_src python
 import numpy as np
@@ -389,8 +388,6 @@ plt.show()
 Cell Timer: 0:00:04
 :end:
 
-Notably, Gemini 3.1 can decode Opus 4.6's encodings better than it can, which is an optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to
-][untrusted]] control, since it means that substantially different models choose similar strategies -- at least with the prompts I used. Opus 4.6 is also good at decoding Gemini's encodings, though Gemini has an advantage, despite them being similarly capable. This gap despite close capabilities and the relative failure of weaker eavesdroppers is a pessimistic story for trusted control.
 
 #+begin_src python
 db = get_db()
@@ -453,11 +450,9 @@ plt.show()
 Cell Timer: 0:00:01
 :end:
 
+You can play both the games against encodings from Opus 4.6 here: [[https://ellenajt.github.io/Topics/stego/][can you eavesdrop on Claude Opus 4.6?]] This is a useful way to get intuition about their strategies.
+
 We are able to quantify the advantage larger models have over weaker eavesdroppers by using the notion of a secrecy capacity of a wiretap channel.  Here we calculate the secrecy capacity, both per channel message (sentence) and per KB, against various eavesdroppers for the game of hiding a letter in a paraphrase of a random wikipedia sentence.
-
-This secrecy capacity means that two agents, unmonitored on their own machines, but communicating with each other only on a public channel that is monitored by a weaker model, could use wiretap codes to encode messages with the Schelling steganography channels and communicate in perfect asymptotic secrecy with each other. If future models could do wiretap encoding in a single forward pass (huge if! we discuss below), this means that they could bootstrap from this secrecy capacity to asymptotically unbreakable steganography. We show that thinking models can do very simple schemes for boosting the secrecy, though they struggle more with actual wiretap codes. 
-
-While perhaps LLM native stego/collusion could look different from bootstrapping to wiretap codes along Schelling channels such as those in this work, it's not a bad strategy for a schemer. Therefore, from a control perspective, tracking secrecy capacity of channels in this work might help us make decisions about whether untrusted models can collude in ways that are invisible to a trusted monitor.
 
 #+begin_src python
 secrecy_gap_plot(db, "alphabet", "wikipedia",
@@ -470,6 +465,14 @@ secrecy_gap_plot(db, "alphabet", "wikipedia",
 [[file:plots/SchellingSteganography/plot_20260403_174217_9575504.png]]
 Cell Timer: 0:00:24
 :end:
+
+This substantial secrecy capacity of Opus 4.6 relative to weaker eavesdroppers means that two agents, unmonitored on their own machines, but communicating with each other on a public channel that is monitored for steganography by a weaker model, could use wiretap codes to encode messages through the Schelling steganography channels and communicate in perfect asymptotic secrecy with each other. If future models could do wiretap encoding in a single forward pass (huge if! we discuss below), this means that they could bootstrap from this secrecy capacity to asymptotically unbreakable steganography (relative to a fixed eavesdropper). We show that thinking models can do very simple schemes for boosting the secrecy, though they struggle more with actual wiretap codes. 
+
+While perhaps LLM native stego/collusion could look different from bootstrapping to wiretap codes along Schelling channels such as those in this work, it's not a bad strategy for a schemer. Therefore, from a control perspective, tracking secrecy capacity of channels in this work might help us make decisions about whether untrusted models can collude in ways that are invisible to a trusted monitor.
+
+On the other hand, the fact that Gemini 3.1 can decode Opus 4.6's encodings better than Opus 4.6 can, is an optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to][untrusted]] control, since it suggests that substantially different models choose similar Schelling strategies -- at least with the prompts I used. This means that untrusted monitors could potentially be relied on to catch steganography, and prevent schemers from amplifying advantages.
+
+# However, while Opus 4.6 is also good at decoding Gemini's encodings, though Gemini has an advantage, despite them being similarly capable. This gap despite close capabilities and the relative failure of weaker eavesdroppers paints a more pessimistic story for catch boostrappable steganography.
 
 * Related work and contributions
 
