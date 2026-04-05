@@ -388,6 +388,7 @@ plt.show()
 Cell Timer: 0:00:04
 :end:
 
+Notably, Gemini 3.1 can decode Opus 4.6's encodings better than it can. Opus 4.6 is also good at decoding Gemini's encodings, though Gemini has an advantage. 
 
 #+begin_src python
 db = get_db()
