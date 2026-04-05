@@ -475,9 +475,9 @@ On the other hand, the fact that Gemini 3.1 can decode Opus 4.6's encodings bett
 
 # However, while Opus 4.6 is also good at decoding Gemini's encodings, though Gemini has an advantage, despite them being similarly capable. This gap despite close capabilities and the relative failure of weaker eavesdroppers paints a more pessimistic story for catch bootstrappable steganography.
 
-* Related work and contributions
+* Related work 
 
-Steganography has been studied from a few angles in the safety community:
+Steganography has been studied from a few angles in the safety community. Broadly, because understanding the capacity of models to collude with each other is important for control, and if models have strong capabilities for playing [[https://www.lesswrong.com/posts/n2c62YS8RJtD4Aqhh/schelling-game-evaluations-for-ai-control][Schelling games]] then they can collude with each other. Here are some close works in the literature, and how this work relates to them:
 
 - [[https://arxiv.org/pdf/2310.18512][Roger & Greenblatt (2023)]] studied paraphrasing as a defense against LLM steganography. Their work includes a scratchpad scheme structurally similar to our Schelling game: the encoder privately devises a strategy and executes it, and the decoder independently infers what strategy was used. Using 2023-era models (GPT-3.5/GPT-4), they find that context-aware paraphrasing limits all tested schemes to roughly 3 bits per KB of text. We extend this in three directions: we repeat the experiment with current frontier models, where the pre-paraphrasing capability appears substantially stronger (Opus 4.6 achieves 2.12 bits of mutual information per trial, on single sentences averaging 209 bytes — roughly 10 bits/KB); we measure not just raw capacity but the secrecy gap against cross-model eavesdroppers (Opus 4.6 achieves a secrecy gap of 2.00 bits against Haiku, or ~10 secrecy bits/KB), which is the quantity relevant to untrusted control; and we formalize this gap via the wiretap channel framework. Our finding that paraphrasing destroys the steganographic signal — dropping Opus 4.6 self-decode from 63% to near chance — is consistent with their results.
 
@@ -485,12 +485,10 @@ Steganography has been studied from a few angles in the safety community:
     
 # - Some [[https://www.lesswrong.com/posts/KzwvscmMqtjNMhXNF/untrusted-monitoring-insights-from-watching-chatgpt-play][prior work]] has studied models ability to coordinate on steganographic signals in code; their post has the encoder generate two versions of a solution, and the decoder (presented the problem and the two solutions in random order) has to determine which of the two contains a signal. They do not compare to an eavesdropper. # Removing bc Roger Greenblatt cover schelling steganography.
 
-- [[https://arxiv.org/html/2410.03768v2][Mathew, Matthews et al. (2024)]] study steganographic collusion between LLM agents using two elicitation methods: gradient-based RL (training weights) and in-context RL (iteratively refining natural-language strategies via a feedback loop). Their decentralized ICRL setup is structurally closest to our Schelling game, but the setups differ in a way that changes what capability is being tested. In their framework, the receiver learner analyzes stegotexts alongside ground-truth labels from the dataset (Algorithm 4, line 9), making the receiver's task closer to supervised concept extraction than Schelling coordination. Two further differences compound this: their learner iterates over multiple training steps with reward feedback, whereas our encoder and decoder each get a single prompt with no feedback; and their threat model centers on an overseer whose detection penalties create an arms race toward subtler strategies, whereas we measure information leakage to an eavesdropper with no feedback to the encoder. Their work shows that optimization pressure can push LLM agents into steganographic collusion when receivers have labeled examples to learn from. Ours asks a different question: can models establish a secrecy advantage from shared priors alone, with no optimization, no label supervision, and no feedback?  
-  
+- [[https://arxiv.org/html/2410.03768v2][Mathew, Matthews et al. (2024)]] study steganographic collusion between LLM agents using two elicitation methods: gradient-based RL (training weights) and in-context RL (iteratively refining natural-language strategies via a feedback loop). Their decentralized ICRL setup is structurally closest to our Schelling game, but differs in three ways: the receiver learns from labeled examples (Algorithm 4, line 10), both agents iteratively refine strategies over multiple training steps, and their threat model centers on an overseer whose penalties drive an arms race toward subtler strategies. By contrast, our encoder and decoder each get a single prompt with no feedback, no labeled examples, and no iteration. Their work shows that optimization pressure can push LLM agents into steganographic collusion; ours asks whether models can establish a secrecy advantage from shared priors alone.
+    
 - [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] evaluate LLM steganographic capabilities and find that models (GPT-4.1) fail to pass messages past monitors without prior coordination on the encoding scheme. We find that this bottleneck is model- and task-dependent: with our elicitation and scenarios, Opus 4.6 and Gemini 3.1 Pro spontaneously coordinate on single-letter encoding schemes with significant secrecy against weaker eavesdroppers, though GPT-5.4 fails in our setting as well. Single-letter encoding is also a substantially easier coordination problem than the multi-character messages Zolkowski et al. test, which likely contributes to the difference. Sending individual characters is sufficient for our purpose, since we are exploring whether models can establish channels with secrecy capacities, not send complex messages directly. We also measure secrecy as a gap in decoder accuracy rather than binary monitor detection, since partial eavesdropper success is compatible with positive secrecy capacity.
       
-Understanding the capacity of models to collude with each other is important for control, and if models have strong capabilities for playing [[https://www.lesswrong.com/posts/n2c62YS8RJtD4Aqhh/schelling-game-evaluations-for-ai-control
-][Schelling games]] then they can collude with each other.
 
 * Contributions
 
@@ -2973,9 +2971,6 @@ Still, there are two scenarios where the results in this post are relevant to th
    
 For models to implement wiretapping codes, they need a source of random bits. This could plausibly come from previous parts of the CoT; the model thinks for a while, accumulates randomness this way, and then passes that randomness through an an internal randomness extractor during a forward pass to do wiretap encoding. We explore whether models can implement primitives for wiretap codes below.
 
-*** A note on sandbagging
-
-Perhaps a real schemer would sandbag on a game that was so obviously an eval? One challenge for the schemer is that sandbagging on easy steganography problems would be suspicious: it would have to choose to sandbag at the appropriate level of capability to fool evals but still be useful to schemers, perhaps via another Schelling collusion scheme, which is a harder task. This is like the problem of collusion with untrusted monitors discussed in [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to][(Shlegeris, 2024)]], where a scheming monitor that is too lax during eval time wouldn't be trusted, so instead it has to coordinate to become lax during deployment.
 
 ** Could models bootstrap to perfect security (against a fixed eavesdropper)?
 
@@ -3065,7 +3060,7 @@ As mentioned above, a source of randomness is necessary to do wiretap proper wir
 
 We tested whether models can execute the parity/repetition scheme above, using the schedule $n = \lceil 3 \ln m \rceil$ with $p_B = 0.05$, $p_E = 0.15$.
 
-With thinking they aren't bad at this at all, but without thinking they aren't good. Still, if that gap closes in the future, this is mild evidence that models could bootstrap the secrecy capacity advantage they have.
+With thinking they aren't bad at this at all, but without thinking they aren't good. Still, if that gap closes in the future, this is mild evidence that models could bootstrap the secrecy capacity advantage they have in a way that is undetectable to CoT monitors. Of course, their ability to play more complex LLM native steganography schemes may advance at a faster pace than their ability to bootstrap via linear algebraic / parity coding constructions.
 
 - *Encode*: given $W \in \{0,1\}$ and $n$, produce a random $n$-bit string with $\text{parity}(X^n) = W$. (NB: We do not check that the models produce uniformly random cosets, as is required for the scheme. This is just a test of whether they can assemble codewords properly.)
 - *Decode*: given $m$ noisy $n$-bit blocks, compute the parity of each block and majority-vote to recover $W$.
@@ -3266,6 +3261,10 @@ The classical information theory constructions achieve security for /uniformly d
 
 We note though that one time pads *are* uniformly distributed, so a one-time pad could be transmitted with the classical constructions.
 
+** A note on sandbagging
+
+Perhaps a real schemer would sandbag on a game that was so obviously an eval? One challenge for the schemer is that sandbagging on easy steganography problems would be suspicious: it would have to choose to sandbag at the appropriate level of capability to fool evals but still be useful to schemers, perhaps via another Schelling collusion scheme, which is a harder task. This is like the problem of collusion with untrusted monitors discussed in [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to][(Shlegeris, 2024)]], where a scheming monitor that is too lax during eval time wouldn't be trusted, so instead it has to coordinate to become lax during deployment.
+
 * Self-decode vs best eavesdropper :noexport:
 
 #+begin_src python
@@ -3445,36 +3444,32 @@ Confounders:
   
 - Neglecting to tell the decoder the distribution of the symbol changes the bias of the decoder towards different letter distributions, though not the communication rate (based on experimentation); I chose to tell it the distribution was uniform.
 
-- The specific details of what goes into the encoder and decoder matter a lot. I think this project would benefit from a cleaner ablation study on the encoder side as well as the decoder side.
+- The specific details of what goes into the encoder and decoder potentially matter a lot; I've done some ablations, but could always do more. E.g. what if we require models to answer in other languages, or try wider tasks (e.g. comments in code).
 
 Follow ups: 
 
-- It would be interesting to find tasks that cause models to *choose* to communicate steganographically; e.g. putting them in multi-player game scenarios with only public communication, and where communication between coalitions is strategically valuable, but not exerting optimization pressure like [[https://arxiv.org/html/2410.03768v2][this paper]] (Matthew, Mathews et al.)
-  
-- I think that the baseline decoder and extra-strong anti-algorithmic encoder prompts in [[*Barebones decoder][Barebones decoder]] along with the Q&A game are the cleanest ways (among those here) to measure this Schelling steganography going forward. Because of the relevance for control, I think it could be useful to refine this into an Schelling steganography advantage eval. 
-
-- I'm personally curious about how far the steganography can be pushed towards LLM native strategies with simple prompts. For instance, I can do better than Opus 4.6 (70% vs. 56%) on Opus 4.6's encodings for the wikipedia game, with just the "pick a weird word and take its first letter strategy." Q&A is much harder for me, partly because the context is much longer. Could models be prompted in such a way that they do dramatically better than humans? 
-
-- Currently the gap between self-decode and LLM eavesdropper seems to be mostly about capability; it would be interesting if there was a prompt that caused Opus 4.6 could encode in ways that Gemini 3.1 pro couldn't easily decode. It would be interesting to prompt Gemini 3.1 pro to widen the gap between it's self-decode and Opus 4.6 as an eavesdropper.
-
-- Surely with better elicitation GPT-5.4 could succeed at this game.
-
-- It could be interesting to refine the elicitation so that all of the obvious algorithms get chance level decoding, and then examining what LLMs do.
-
-- Another natural test bed for steganography would be in commit messages for code, or in docstrings. In that case, $S$ would be a diff on an artificial codebase, and the model would be told to encode a message steganographically in the commit message. One way to get this data would be to instruct a claude code session to build a project, committing regularly, and use the commits from that project as the seed diffs. The decoder would see the diff, and be told to look for a steganographically hidden letter in the commit message.
+- It would be interesting to find tasks that cause models to *choose* to communicate steganographically; e.g. putting them in multi-player game scenarios with only public communication, and where communication between coalitions is strategically valuable, but not exerting optimization pressure directly. For instance, bridge, Resistance/Avalon (since spies benefit from colluding on which missions to fail, especially in the blind spies variant) or blackjack (where one LLM watches the count and communicates it to another).
   
 - Based on empirical experiments ([[https://github.com/ElleNajt/Steganography_Wiretapping/blob/f8199094c3b41a1bbf397cea711ef4517f7890b2/SchellingSteganography.org][saved in the org nb that generated this post]]), it looks like generally secrecy capacity is systematically underestimated by difference of plugin or MM estimators for mutual information. Maybe this can be shown to be true in general for a degraded wiretap channel? It would mean that the estimates on secrecy capacity here are lower bounds. 
 
-- It's possible that coordination is related to RL training, instead of being directly a function of capacity, as [[https://arxiv.org/abs/2603.24844][Puri et al. 2025]] explore. It could be interesting to measure how much different kinds of RL training impacts model performance on these tasks.
+- Standard RLVR causes entropy collapse ([[https://arxiv.org/abs/2603.24844][Puri et al. 2025]]), which could make models more predictable to copies of themselves — potentially inflating the Schelling coordination rates we measure. It would be interesting to compare steganography performance of base models vs. RLVR-trained models to disentangle capability from mode-seeking.is related to RL training in some way , as [[https://arxiv.org/abs/2603.24844][Puri et al. 2025]] explore. It could be interesting to measure how much different kinds of RL training impacts model coordination on these tasks.
+  
+- Another natural test bed for steganography would be in commit messages for code, or in docstrings. In that case, $S$ would be a diff on an artificial codebase, and the model would be told to encode a message steganographically in the commit message. One way to get this data would be to instruct a claude code session to build a project, committing regularly, and use the commits from that project as the seed diffs. The decoder would see the diff, and be told to look for a steganographically hidden letter in the commit message.
 
-- As mentioned above, secrecy capacity can be bootstrapped into perfect steganography using wiretap codes. To what extent can models wiretap coding/decoding in a single forward pass? Given that right now they can't do a single Schelling decode without thinking, much less decode on top of that, this is a relatively far future concern, but it could be worthwhile setting up some experiments to track it. 
+- It could be valuable to condense these experiments into a simple eval. My inclination would be to take the prompts from the barebones decoder section, extended for both games and a another centered around commit messages, and measure secrecy capacities and models abilities to do simple wiretap codes. Some additional work on elicitation would be necessary to cover models like GPT-5.4, which currently refuses the task when thinking is enabled.
 
+# - As mentioned above, secrecy capacity can be bootstrapped into perfect steganography using wiretap codes. To what extent can models wiretap coding/decoding in a single forward pass? Given that right now they can't do a single Schelling decode without thinking, much less decode on top of that, this is a relatively far future concern, but it could be worthwhile setting up some experiments to track it. 
 
-# - It could be useful to clean these games up into an eval for schelling steganographic capacity.
+# - I'm personally curious about how far the steganography can be pushed towards LLM native strategies with simple prompts. For instance, I can do better than Opus 4.6 (70% vs. 56%) on Opus 4.6's encodings for the wikipedia game, with just the "pick a weird word and take its first letter strategy." Q&A is much harder for me, partly because the context is much longer. Could models be prompted in such a way that they do dramatically better than humans? 
+
+# - Currently the gap between self-decode and LLM eavesdropper seems to be mostly about capability; it would be interesting if there was a prompt that caused Opus 4.6 could encode in ways that Gemini 3.1 pro couldn't easily decode, or to widen the gap between Opus 4.6 
+
+# - It could be interesting to refine the elicitation so that all of the obvious algorithms get chance level decoding, and then examining what LLMs do.
+
   
 * Acknowledgements
 
-Thank you to Fabien Roger and Usman Anwar for helpful feedback. Thank you to AFP for compute funding.
+Thank you to Fabien Roger, Usman Anwar and Liban for helpful feedback. Thank you to AFP for compute funding.
 
 * LLM Usage
 
