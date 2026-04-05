@@ -3136,9 +3136,7 @@ Cell Timer: 0:00:00
 
 ** Semantic security
 
-The classical information theory constructions achieve security for /uniformly distributed/ messages. A scheming model's messages are not uniform — they're determined by whatever the model wants to communicate. For security against arbitrary message distributions, you need /semantic security/, which is security ag
-
-[[https://homes.cs.washington.edu/~tessaro/papers/wiretap-proc.pdf][Bellare, Tessaro, and Vardy (2012)]] show that achieving semantic security is possible via more complex constructions. Extending the experiments here to that work is beyond the scope of this post. 
+The classical information theory constructions achieve security for /uniformly distributed/ messages. A scheming model's messages are not uniform — they're determined by whatever the model wants to communicate. For security against arbitrary message distributions, you need /semantic security/, which is security against an adversary for any message distribution. [[https://homes.cs.washington.edu/~tessaro/papers/wiretap-proc.pdf][Bellare, Tessaro, and Vardy (2012)]] show that achieving semantic security is possible via more complex constructions. Extending the experiments here to that work is beyond the scope of this post.
 
 We note though that one time pads *are* uniformly distributed, so a one-time pad could be transmitted with the classical constructions.
 
