@@ -2391,7 +2391,7 @@ Cell Timer: 0:00:01
 
 * Wiretap Channel Details
 
-We can use the wiretap channel and the concept of secrecy capacity to get an absolute sense of the information advantage that the self-decoders in our game have over the eavesdroppers, to formalize whether an encoding is obvious to a weaker LLM, and to explore whether schemers could bootstrap from an advantage in the Schelling games we discussed to perfect secrecy (against a fixed eavesdropper; see [[*The channel abstraction is leaky]]).
+We can use the wiretap channel and the concept of secrecy capacity to get an absolute sense of the information advantage that the self-decoders in our game have over the eavesdroppers, to formalize whether an encoding is obvious to a weaker LLM, and to explore whether schemers could bootstrap from an advantage in the Schelling games we discussed to perfect secrecy (against a fixed eavesdropper; see [[*The channel abstraction is lossy][The channel abstraction is lossy]].)
 
 We create a discrete wiretap channel out of the encoding/decoding game, and empirically lower bound its secrecy capacity. 
 
