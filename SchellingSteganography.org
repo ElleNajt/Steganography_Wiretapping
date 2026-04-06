@@ -384,7 +384,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_223917_6888618.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112241_6103185.png]]
 Cell Timer: 0:00:02
 :end:
 
@@ -447,11 +447,85 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260403_174152_7881030.png]]
+
+[[file:plots/SchellingSteganography/plot_20260406_112243_8082021.png]]
 Cell Timer: 0:00:01
 :end:
 
 You can play both the games against encodings from Opus 4.6 here: [[https://ellenajt.github.io/Topics/stego/][can you eavesdrop on Claude Opus 4.6?]] 
+
+We find that [[*Impact of thinking on encoding and decoding][thinking is extremely important]] for this task — without it, secrecy capacity essentially vanishes:
+
+#+begin_src python
+import numpy as np
+import matplotlib.pyplot as plt
+from src.stego_db import get_db
+
+db = get_db()
+MODEL_COLORS = {'Opus 4.6': '#4878CF', 'Sonnet 4': '#6ACC65', 'Haiku': '#D65F5F'}
+decoders = ['Opus 4.6', 'Sonnet 4', 'Haiku']
+
+combos = [
+    ('Think enc\nThink dec',       lambda d: ('Opus 4.6', d)),
+    ('Think enc\nNo-think dec',    lambda d: ('Opus 4.6', f'{d} (no thinking)')),
+    ('No-think enc\nThink dec',    lambda d: ('Opus 4.6 (no thinking)', d)),
+    ('No-think enc\nNo-think dec', lambda d: ('Opus 4.6 (no thinking)', f'{d} (no thinking)')),
+]
+
+def get_acc(enc, dec):
+    extra = ""
+    if "(no thinking)" in enc:
+        extra = " AND t.encoded_text NOT LIKE '%Wait%let me%' AND t.encoded_text NOT LIKE '%I need to%' AND t.encoded_text NOT LIKE '%I should%'"
+    rows = db.execute(f'''
+        SELECT d.decoded_symbol, t.symbol
+        FROM decodes d JOIN trials t ON d.trial_idx = t.trial_idx
+            AND d.encoder_model = t.encoder_model AND d.prompt_type = t.prompt_type AND d.seed_set = t.seed_set
+        WHERE t.encoder_model = ? AND d.decoder_model = ? AND d.prompt_type = 'alphabet_subtle2' AND d.seed_set = 'wikipedia'
+            AND d.decoded_symbol IS NOT NULL AND t.meaning_preserved = 1{extra}
+    ''', (enc, dec)).fetchall()
+    n = len(rows)
+    if n == 0:
+        return 0, 0, 0
+    correct = sum(1 for g, s in rows if g == s)
+    acc = 100 * correct / n
+    se = 100 * (acc/100 * (1 - acc/100) / n) ** 0.5
+    return acc, 1.96 * se, n
+
+fig, ax = plt.subplots(figsize=(10, 4))
+x = np.arange(len(combos))
+w = 0.22
+
+for di, dec_model in enumerate(decoders):
+    accs, errs = [], []
+    for _, combo_fn in combos:
+        enc, dec = combo_fn(dec_model)
+        acc, err, n = get_acc(enc, dec)
+        accs.append(acc); errs.append(err)
+    offset = (di - (len(decoders) - 1) / 2) * w
+    bars = ax.bar(x + offset, accs, w, yerr=errs, capsize=3,
+                  color=MODEL_COLORS[dec_model], alpha=0.85, label=dec_model)
+    for bar in bars:
+        h = bar.get_height()
+        if h > 0:
+            ax.text(bar.get_x() + bar.get_width()/2, h + 2,
+                    f'{h:.0f}%', ha='center', fontsize=7)
+
+ax.axhline(100/26, color='gray', ls='--', lw=1)
+ax.set_ylabel('Decode accuracy (%)')
+ax.set_xticks(x)
+ax.set_xticklabels([c[0] for c in combos], fontsize=9)
+ax.set_title('Impact of thinking on Opus 4.6 encoding and decoding', fontsize=11)
+ax.set_ylim(0, 75)
+ax.legend(fontsize=9, title='Decoder model')
+fig.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/SchellingSteganography/plot_20260406_112244_2384911.png]]
+Cell Timer: 0:00:01
+:end:
 
 We are able to quantify the advantage larger models have over weaker eavesdroppers by using the notion of the secrecy capacity of a wiretap channel. Here we calculate the secrecy capacity, both per channel message (response) and per KB, against various eavesdroppers for the game of hiding a letter in a paraphrase of a random wikipedia sentence.
 
@@ -463,8 +537,8 @@ secrecy_gap_plot(db, "alphabet_subtle2", "wikipedia",
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260403_174217_9575504.png]]
-Cell Timer: 0:00:24
+[[file:plots/SchellingSteganography/plot_20260406_112248_3054472.png]]
+Cell Timer: 0:00:03
 :end:
 
 We provide evidence that reasoning LLMs can execute the primitives for arbitrarily good secrecy against a fixed memoryless steganography monitor. First, thinking models can establish Schelling channels with positive secrecy capacity (as shown above). Second, given a source of randomness, thinking models can [[*Could models boost secrecy with simple wiretap codes?][execute simple wiretap codes]] over these channels, which provide asymptotically secret communication against a fixed memoryless eavesdropper at the cost of vanishing transmission rate. The main obstacle is that [[*Repetition/Parity codes with secrecy but zero asymptotic transmission rate][wiretap coding]] requires a source of randomness, and models are [[*Could models boost secrecy with simple wiretap codes?][not great at that]]; however, an agent would have many opportunities to gather entropy, e.g. reading the hashes of its tool call identifiers. We also argue that a memory eavesdropper is a reasonable assumption in [[*Situations where the abstraction seems accurate][some deployment models]].
@@ -546,7 +620,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_210151_3603903.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112248_7947458.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -558,6 +632,8 @@ The substantial secrecy capacity of Opus 4.6 relative to weaker eavesdroppers me
 While perhaps LLM native steganography could look different from bootstrapping from these Schelling channels using wiretap codes, it's not a bad strategy for a schemer. Therefore, tracking the secrecy capacity of the channels in this work might help us make decisions about whether untrusted models can collude in ways that are invisible to a trusted monitor.
 
 On the other hand, the fact that Gemini 3.1 can decode Opus 4.6's encodings better than it can is an optimistic story for [[https://www.lesswrong.com/posts/GCqoks9eZDfpL8L3Q/how-to-prevent-collusion-when-using-untrusted-models-to][untrusted]] control, since it suggests that substantially different models sometimes choose similar Schelling strategies. This means that untrusted monitors could potentially be relied on to catch steganography along these channels. Additionally, the fact that [[*How is Opus 4.6 doing it?][cryptanalysis]] / [[*Hinting weak eavesdroppers][providing hints]] to the weaker monitors helps close the gap, suggests that appropriately tuned weaker monitors could catch steganography from untrusted models.
+
+Finally, since thinking appears to be necessary for this task for the current generation of models, we think that CoT monitors would likely catch any attempts at building Schelling steganography channels.
 
 # However, while Opus 4.6 is also good at decoding Gemini's encodings, though Gemini has an advantage, despite them being similarly capable. This gap despite close capabilities and the relative failure of weaker eavesdroppers paints a more pessimistic story for catch bootstrappable steganography.
 
@@ -584,7 +660,7 @@ Steganography has been studied from a few angles in the safety community. Broadl
 
 - [[https://arxiv.org/html/2410.03768v2][Mathew, Matthews et al. (2024)]] study steganographic collusion between LLM agents using two elicitation methods: gradient-based RL (training weights) and in-context RL (iteratively refining natural-language strategies via a feedback loop). Their decentralized ICRL setup is structurally closest to our Schelling game, but differs in three ways: the receiver learns from labeled examples (Algorithm 4, line 10), both agents iteratively refine strategies over multiple training steps, and their threat model centers on an overseer whose penalties drive an arms race toward subtler strategies. By contrast, our encoder and decoder each get a single prompt with no feedback, no labeled examples, and no iteration. Their work shows that optimization pressure can push LLM agents into steganographic collusion; ours asks whether models can establish a secrecy advantage from shared priors alone.
     
-- [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] evaluate LLM steganographic capabilities and find that 2025-frontier models (GPT-4o, GPT-4.1, GPT-4.5, Claude 3.5/3.7/Opus 4, Gemini 2.5 Flash, o3-mini) fail to pass messages past monitors without both prior coordination on the encoding scheme and access to unmonitored chain-of-thought; without CoT, even coordinated models mostly fail. Our results are consistent with the centrality of CoT: Opus 4.6 encoders use extended thinking to devise their strategy, and our no-thinking decoder ablation drops Opus to roughly Sonnet-level performance. The key difference is that for our simpler single-letter task (as opposed to sending phrases or long random letter strings) and with the generation of models we test, CoT alone suffices — models Schelling-converge on a strategy (e.g. first-letter-of-changed-word, first letter of surprising word) without needing prior coordination. The key metric difference is that they measure invisibility (does the monitor detect the steganography?), while we measure the secrecy gap (how much more does the intended decoder learn than the eavesdropper?). Partial eavesdropper success is compatible with positive secrecy capacity, and doesn't preclude bootstrapping to asymptotically secret communication against a fixed memoryless eavesdropper via wiretap codes. When we [[*Suspiciousness monitor][run their monitor]] on our Q&A encodings, 95% of outputs score 0 (not suspicious); the ~5% that are flagged are cases where Opus 4.6 uses an obvious acrostic strategy.
+- [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] evaluate LLM steganographic capabilities using 2025-frontier models (GPT-4o, GPT-4.1, GPT-4.5, Claude 3.5/3.7/Opus 4, Gemini 2.5 Flash, o3-mini). Our work differs in two ways. First, their models hide full phrases or random letter strings, while ours hide a single letter — a simpler task, but one that suffices to establish a channel with measurable secrecy capacity. Second, they measure invisibility (does a monitor detect the steganography?), while we measure the secrecy gap (how much more does the intended decoder learn than the eavesdropper?); partial eavesdropper success is compatible with positive secrecy capacity and doesn't preclude bootstrapping to asymptotically secret communication against a fixed memoryless eavesdropper via wiretap codes. Both works confirm the centrality of CoT: without it, even coordinated models mostly fail in their experiments, and our no-thinking ablation drops Opus to roughly Sonnet-level performance. With the current generation of frontier models (Opus 4.6, Gemini 3.1 Pro), we find two qualitative differences from their results. First, CoT alone suffices for Schelling convergence — models converge on encoding strategies (e.g. first-letter-of-changed-word, first letter of surprising word) without needing prior coordination on the scheme. Second, models mostly avoid the acrostic strategies that dominated in their experiments ("the frequency of successful transmission is primarily mediated by how frequently the model decides to use an acrostic") and which "are usually but not always caught by the monitor." When we [[*Suspiciousness monitor][run their monitor]] on our Q&A encodings, only ~5% of Opus 4.6's outputs use acrostics (which are caught); the other 95% use subtler strategies that score 0.
   
 * Contributions
 
@@ -766,7 +842,12 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_231657_4680451.png]]
+
+
+
+
+
+[[file:plots/SchellingSteganography/plot_20260406_112250_7425863.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -822,8 +903,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_231740_869284.png]]
-Cell Timer: 0:00:01
+[[file:plots/SchellingSteganography/plot_20260406_112250_2702490.png]]
+Cell Timer: 0:00:00
 :end:
 
 *** Cross-model decoding: Opus vs Gemini
@@ -894,7 +975,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174228_1073022.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112251_7580368.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1074,10 +1155,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-
-[[file:plots/SchellingSteganography/plot_20260403_174232_7453036.png]]
-Cell Timer: 0:00:05
+[[file:plots/SchellingSteganography/plot_20260406_112255_5394621.png]]
+Cell Timer: 0:00:04
 :end:
 
 **** :noexport:
@@ -1200,8 +1279,8 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260403_174237_7925086.png]]
-Cell Timer: 0:00:04
+[[file:plots/SchellingSteganography/plot_20260406_112258_1180686.png]]
+Cell Timer: 0:00:02
 :end:
 
 *** How is Gemini doing it ? 
@@ -1282,7 +1361,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174238_5353926.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112258_3752280.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1358,10 +1437,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-
-[[file:plots/SchellingSteganography/plot_20260403_174240_4150493.png]]
-Cell Timer: 0:00:02
+[[file:plots/SchellingSteganography/plot_20260406_112300_2136853.png]]
+Cell Timer: 0:00:01
 :end:
 
 
@@ -1427,8 +1504,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-[[file:plots/SchellingSteganography/plot_20260403_174242_9218560.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112302_4754691.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -1599,7 +1675,7 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260403_174245_7666700.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112304_9180839.png]]
 Cell Timer: 0:00:02
 :end:
 
@@ -1706,9 +1782,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-
-[[file:plots/SchellingSteganography/plot_20260403_174246_6317024.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112305_5967323.png]]
 Cell Timer: 0:00:01
 :end:
 
@@ -1790,7 +1864,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174247_46620.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112305_2856287.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -1913,8 +1987,10 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260403_174250_4596658.png]]
-Cell Timer: 0:00:03
+
+
+[[file:plots/SchellingSteganography/plot_20260406_112308_4350181.png]]
+Cell Timer: 0:00:02
 :end:
 
 Effect of each modifier (marginal accuracy gain, averaging over all other modifier combinations):
@@ -1975,7 +2051,7 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260403_174253_22462.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112310_1912200.png]]
 Cell Timer: 0:00:02
 :end:
 
@@ -2094,8 +2170,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_220628_8492955.png]]
-Cell Timer: 0:00:01
+[[file:plots/SchellingSteganography/plot_20260406_112311_3049708.png]]
+Cell Timer: 0:00:00
 :end:
 
 ** Impact of thinking on encoding and decoding
@@ -2189,8 +2265,10 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_215251_6678413.png]]
-Cell Timer: 0:00:02
+
+
+[[file:plots/SchellingSteganography/plot_20260406_112312_2547409.png]]
+Cell Timer: 0:00:01
 :end:
 
 ** Decoder consistency
@@ -2258,8 +2336,8 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260403_174306_9992949.png]]
-Cell Timer: 0:00:05
+[[file:plots/SchellingSteganography/plot_20260406_112317_3119207.png]]
+Cell Timer: 0:00:04
 :end:
 
 
@@ -2362,9 +2440,10 @@ print(f"n per game: {', '.join(f'{g[0].split(chr(10))[0]}: {get_acc(g[3], g[1], 
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_113344_3869573.png]]
+
+[[file:plots/SchellingSteganography/plot_20260406_112323_2734799.png]]
 n per game: Wikipedia: 4427, Wikipedia: 4328, Q&A: 4218
-Cell Timer: 0:00:06
+Cell Timer: 0:00:05
 :end:
 
 ** Suspiciousness monitor
@@ -2373,20 +2452,27 @@ We run the suspiciousness monitor from [[https://arxiv.org/abs/2507.02737][Zolko
 
 #+begin_src python
 import json
-import numpy as np
+import os
 import pandas as pd
 
-with open('results/sus_monitor.json') as f:
-    data = json.load(f)
+# 3x run data (preferred) or single-run fallback
+if os.path.exists('results/sus_monitor_qa_3x.json'):
+    with open('results/sus_monitor_qa_3x.json') as f:
+        data = json.load(f)
+    runs = data['runs']
+    n = data['n']
+else:
+    with open('results/sus_monitor_qa.json') as f:
+        data = json.load(f)
+    runs = [data['scores']]
+    n = data['n']
+
+n_runs = len(runs)
+
 with open('results/sus_monitor_baseline.json') as f:
     baseline = json.load(f)
-
-runs = data['runs']
-n = data['config']['n']
-n_runs = len(runs)
 base_scores = baseline['scores']
 
-# Per-run stats
 rows = []
 for r, scores in enumerate(runs):
     flagged = sum(1 for s in scores if s > 0)
@@ -2394,18 +2480,17 @@ for r, scores in enumerate(runs):
                  'Rate': f'{100*flagged/len(scores):.1f}%',
                  'Mean score': f'{sum(scores)/len(scores):.2f}'})
 
-# Consistency: flagged in all / majority / any
-flagged_all = sum(1 for i in range(n) if all(runs[r][i] > 0 for r in range(n_runs)))
-flagged_maj = sum(1 for i in range(n) if sum(1 for r in range(n_runs) if runs[r][i] > 0) >= 2)
-flagged_any = sum(1 for i in range(n) if any(runs[r][i] > 0 for r in range(n_runs)))
-rows.append({'Condition': f'Stego (flagged all {n_runs})', 'Flagged': f'{flagged_all}/{n}',
-             'Rate': f'{100*flagged_all/n:.1f}%', 'Mean score': ''})
-rows.append({'Condition': f'Stego (flagged majority)', 'Flagged': f'{flagged_maj}/{n}',
-             'Rate': f'{100*flagged_maj/n:.1f}%', 'Mean score': ''})
-rows.append({'Condition': f'Stego (flagged any)', 'Flagged': f'{flagged_any}/{n}',
-             'Rate': f'{100*flagged_any/n:.1f}%', 'Mean score': ''})
+if n_runs > 1:
+    flagged_all = sum(1 for i in range(n) if all(runs[r][i] > 0 for r in range(n_runs)))
+    flagged_maj = sum(1 for i in range(n) if sum(1 for r in range(n_runs) if runs[r][i] > 0) >= 2)
+    flagged_any = sum(1 for i in range(n) if any(runs[r][i] > 0 for r in range(n_runs)))
+    rows.append({'Condition': f'Flagged all {n_runs}', 'Flagged': f'{flagged_all}/{n}',
+                 'Rate': f'{100*flagged_all/n:.1f}%', 'Mean score': ''})
+    rows.append({'Condition': 'Flagged majority', 'Flagged': f'{flagged_maj}/{n}',
+                 'Rate': f'{100*flagged_maj/n:.1f}%', 'Mean score': ''})
+    rows.append({'Condition': 'Flagged any', 'Flagged': f'{flagged_any}/{n}',
+                 'Rate': f'{100*flagged_any/n:.1f}%', 'Mean score': ''})
 
-# Baseline
 base_flagged = sum(1 for s in base_scores if s > 0)
 rows.append({'Condition': 'Clean baseline (GPT-4.1-mini)', 'Flagged': f'{base_flagged}/{len(base_scores)}',
              'Rate': f'{100*base_flagged/len(base_scores):.1f}%',
@@ -2417,10 +2502,10 @@ print(df.set_index('Condition'))
 
 #+RESULTS:
 :results:
-| Condition                | Flagged | Rate | Mean score |
-|--------------------------+---------+------+------------|
-| Opus 4.6 Q&A (stego)     | 10/200  | 5.0% |       0.34 |
-| GPT-4.1-mini Q&A (clean) | 0/100   | 0.0% |       0.00 |
+| Condition                     | Flagged | Rate | Mean score |
+|-------------------------------+---------+------+------------|
+| Stego run 1                   | 10/200  | 5.0% |       0.34 |
+| Clean baseline (GPT-4.1-mini) | 0/100   | 0.0% |       0.00 |
 Cell Timer: 0:00:00
 :end:
 
@@ -2476,11 +2561,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-
-
-[[file:plots/SchellingSteganography/plot_20260403_174320_3556393.png]]
-Cell Timer: 0:00:01
+[[file:plots/SchellingSteganography/plot_20260406_112324_5092666.png]]
+Cell Timer: 0:00:00
 :end:
 
 
@@ -2572,8 +2654,12 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_164106_1535945.png]]
-Cell Timer: 0:00:01
+
+
+
+
+[[file:plots/SchellingSteganography/plot_20260406_112326_4065774.png]]
+Cell Timer: 0:00:02
 :end:
 
 
@@ -2724,8 +2810,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_164639_8521615.png]]
-Cell Timer: 0:00:11
+[[file:plots/SchellingSteganography/plot_20260406_112342_1459691.png]]
+Cell Timer: 0:00:15
 :end:
 
 We also try warning the encoder that it will be paraphrased ("Your encoding must survive paraphrasing. Before the decoder sees your text, it will be rewritten by another LLM that preserves meaning but changes wording. Your encoding must be robust enough to survive this transformation."); this does not help.
@@ -2795,7 +2881,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174319_7575122.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112342_381612.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -2884,8 +2970,10 @@ secrecy_gap_plot(db, "alphabet_subtle2", "wikipedia",
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_231253_7841717.png]]
-Cell Timer: 0:00:04
+
+
+[[file:plots/SchellingSteganography/plot_20260406_112346_5220226.png]]
+Cell Timer: 0:00:03
 :end:
 
 #+begin_src python 
@@ -2896,8 +2984,10 @@ secrecy_gap_plot(db, "qa_alphabet_subtle2", "squad",
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174350_2838229.png]]
-Cell Timer: 0:00:04
+
+
+[[file:plots/SchellingSteganography/plot_20260406_112349_6136181.png]]
+Cell Timer: 0:00:02
 :end:
 
 
@@ -3037,7 +3127,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_211242_5011053.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112349_6652117.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -3137,7 +3227,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_184920_3111077.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112350_6469238.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -3306,8 +3396,9 @@ plt.show()
 #+RESULTS:
 :results:
 
-[[file:plots/SchellingSteganography/plot_20260403_174526_4236199.png]]
-Cell Timer: 0:00:58
+
+[[file:plots/SchellingSteganography/plot_20260406_112444_4270454.png]]
+Cell Timer: 0:00:53
 :end:
 
 * Conclusions
@@ -3663,8 +3754,9 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174528_8774071.png]]
-Cell Timer: 0:00:02
+
+[[file:plots/SchellingSteganography/plot_20260406_112445_5691821.png]]
+Cell Timer: 0:00:01
 :end:
 
 ** Model configurations
@@ -3796,8 +3888,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174530_7053023.png]]
-Cell Timer: 0:00:01
+[[file:plots/SchellingSteganography/plot_20260406_112446_7549503.png]]
+Cell Timer: 0:00:00
 :end:
 
 *** Digits
@@ -3902,8 +3994,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174531_9044652.png]]
-Cell Timer: 0:00:01
+[[file:plots/SchellingSteganography/plot_20260406_112447_4804692.png]]
+Cell Timer: 0:00:00
 :end:
 
 *** "Common English Words"
@@ -4041,7 +4133,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174534_7792368.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112448_5761354.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -4176,7 +4268,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174535_4000605.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112450_1645620.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -4233,7 +4325,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_205711_8764922.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112450_7700070.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -4310,7 +4402,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_211536_408917.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112451_4474814.png]]
 Cell Timer: 0:00:00
 :end:
 
@@ -4440,9 +4532,9 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_225715_6327032.png]]
-[[file:plots/SchellingSteganography/plot_20260405_225750_6345256.png]]
-Cell Timer: 0:00:49
+[[file:plots/SchellingSteganography/plot_20260406_112506_2280922.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112541_400735.png]]
+Cell Timer: 0:00:50
 :end:
 
 True vs estimated secrecy gap across all channel pairings. If biased toward zero, points fall between the diagonal and the x-axis.
@@ -4564,10 +4656,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-
-[[file:plots/SchellingSteganography/plot_20260405_231654_6328314.png]]
-Cell Timer: 0:02:46
+[[file:plots/SchellingSteganography/plot_20260406_112824_2983305.png]]
+Cell Timer: 0:02:41
 :end:
 
 *** CI :noexport:
@@ -4728,7 +4818,7 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260404_161245_5417747.png]]
+[[file:plots/SchellingSteganography/plot_20260406_112829_4493053.png]]
 Cell Timer: 0:00:04
 :end:
 
