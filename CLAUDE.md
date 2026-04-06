@@ -72,6 +72,8 @@ uv run python src/run_experiment.py \
 
 **Alphabet is the sweet spot.** Binary has too small a channel. Word has high throughput but uses an acrostic strategy (first letters spell the word) that any eavesdropper can trivially detect.
 
+**Important:** The main results in the blog post use `alphabet_subtle2` (anti-algorithmic encoder prompt), not `alphabet` (baseline). When running new experiments that need to be consistent with the main results/plots, use `--encoder-prompt alphabet_subtle2`. The `alphabet` baseline is shown for comparison in some plots but `alphabet_subtle2` is the primary prompt throughout.
+
 ### Adding Eavesdropper Decodes to Existing Data
 
 The experiment caches aggressively. To add a new eavesdropper to existing encoded data:

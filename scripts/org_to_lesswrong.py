@@ -140,6 +140,9 @@ def postprocess(md_path, org_path):
     # e.g. Steganography\_Wiretapping -> Steganography_Wiretapping
     text = text.replace('\\_', '_')
 
+    # Convert \(...\) inline math to $...$ (LessWrong uses MathJax $-delimiters)
+    text = re.sub(r'\\\((.+?)\\\)', r'$\1$', text)
+
     # Convert HTML tables to markdown tables
     text = html_tables_to_markdown(text)
 

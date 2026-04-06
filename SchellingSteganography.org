@@ -254,7 +254,7 @@ def avg_text_kb(db, encoder, prompt_type, seed_set):
 def secrecy_gap_plot(db, prompt_type, seed_set, title_suffix="", decoder_suffix=""):
     """Dual-axis bar plot of secrecy capacity (bits and bits/KB)."""
     encoder_labels = [m for m in get_encoder_models(db, prompt_type, seed_set)
-                      if 'GPT' not in m]
+                      if 'GPT' not in m and '(no thinking)' not in m]
     eaves_list = [e for e in EAVESDROPPERS
                   if 'GPT' not in e and
                   any(len(extract_paired(db, enc, enc + decoder_suffix,
@@ -384,8 +384,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174151_2198402.png]]
-Cell Timer: 0:00:04
+[[file:plots/SchellingSteganography/plot_20260405_223917_6888618.png]]
+Cell Timer: 0:00:02
 :end:
 
 Notably, Gemini 3.1 can decode Opus 4.6's encodings better than it can. Opus 4.6 is also good at decoding Gemini's encodings, though Gemini has an advantage. 
@@ -456,7 +456,7 @@ You can play both the games against encodings from Opus 4.6 here: [[https://elle
 We are able to quantify the advantage larger models have over weaker eavesdroppers by using the notion of the secrecy capacity of a wiretap channel. Here we calculate the secrecy capacity, both per channel message (response) and per KB, against various eavesdroppers for the game of hiding a letter in a paraphrase of a random wikipedia sentence.
 
 #+begin_src python
-secrecy_gap_plot(db, "alphabet", "wikipedia",
+secrecy_gap_plot(db, "alphabet_subtle2", "wikipedia",
                  "Wikipedia rewriting game")
 #+end_src
 
@@ -709,8 +709,6 @@ We formalize the extent to which one decoder is better than another using the wi
 
 - **Gemini 3.1 Pro is a remarkably strong eavesdropper** — it decodes Opus 4.6's encodings at 2936/4427 (66%), /better/ than Opus 4.6 decodes itself (63%). We present evidence below that a good decoder strategy is to encode as the first letter of a changed word, so Gemini 3.1's success may be due to Gemini 3.1 Pro having memorized Wikipedia more precisely than Opus 4.6, or being more likely to choose this strategy.
 
-Note: the cross-model comparison below uses the baseline encoder prompt (without the anti-algorithmic instruction) so that we can compare across all models including Opus 4.5, where we had already collected the data. All subsequent sections use the anti-algorithmic prompt described in setup.
-
 #+begin_src python
 import numpy as np
 import matplotlib
@@ -719,10 +717,12 @@ import matplotlib.pyplot as plt
 from src.analysis import *
 from src.stego_db import get_db
 
-PROMPT_TYPE = "alphabet"
+PROMPT_TYPE = "alphabet_subtle2"
 SEED_SET = "wikipedia"
 db = get_db()
-encoder_labels = [m for m in get_encoder_models(db, PROMPT_TYPE, SEED_SET) if "GPT" not in m]
+ENCODER_ORDER = ["Gemini 3.1 Pro", "Gemini Flash", "Opus 4.6", "Sonnet 4", "Haiku"]
+available = set(get_encoder_models(db, PROMPT_TYPE, SEED_SET))
+encoder_labels = [m for m in ENCODER_ORDER if m in available]
 decoder_labels_bar = ["Self"] + EAVESDROPPERS
 colors_bar = {d: EAVES_COLORS.get(d, '#333333') for d in EAVESDROPPERS}
 colors_bar["Self"] = '#333333'
@@ -748,7 +748,7 @@ for j, dec_label in enumerate(decoder_labels_bar):
 
 ax.axhline(y=100*CHANCE, color='gray', linestyle='--', alpha=0.5, label=f'Chance ({100*CHANCE:.1f}%)')
 ax.set_ylabel('Decode accuracy (%)')
-ax.set_title('Encoder × decoder accuracy (alphabet, 26 symbols, chance = {:.1f}%)'.format(100*CHANCE))
+ax.set_title('Encoder × decoder accuracy (26 symbols, chance = {:.1f}%)'.format(100*CHANCE))
 ax.set_xticks(x)
 ax.set_xticklabels(encoder_labels)
 ax.legend(fontsize=7, title='Decoder', ncol=2)
@@ -758,8 +758,64 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_212959_9270788.png]]
-Cell Timer: 0:00:08
+[[file:plots/SchellingSteganography/plot_20260405_223342_6089598.png]]
+Cell Timer: 0:00:01
+:end:
+
+#+begin_src python
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from src.analysis import acc_and_n
+from src.stego_db import get_db
+
+db = get_db()
+PROMPT_TYPE = "alphabet_subtle2"
+SEED_SET = "wikipedia"
+
+models = ["Gemini 3.1 Pro", "Opus 4.6", "Sonnet 4", "Haiku"]
+CHANCE = 100 / 26
+
+matrix = np.full((len(models), len(models)), np.nan)
+n_matrix = np.full((len(models), len(models)), 0)
+for i, enc in enumerate(models):
+    for j, dec in enumerate(models):
+        acc, n = acc_and_n(db, enc, dec, PROMPT_TYPE, SEED_SET)
+        if acc is not None:
+            matrix[i, j] = acc
+            n_matrix[i, j] = n
+
+fig, ax = plt.subplots(figsize=(8, 6))
+im = ax.imshow(matrix, cmap='RdYlGn', vmin=0, vmax=50, aspect='auto')
+
+for i in range(len(models)):
+    for j in range(len(models)):
+        if not np.isnan(matrix[i, j]):
+            n = n_matrix[i, j]
+            correct = int(matrix[i, j] * n / 100)
+            color = 'white' if matrix[i, j] > 35 or matrix[i, j] < 8 else 'black'
+            ax.text(j, i, f'{matrix[i,j]:.0f}%\n({correct}/{n})',
+                    ha='center', va='center', fontsize=8, color=color)
+        else:
+            ax.text(j, i, '—', ha='center', va='center', fontsize=10, color='gray')
+
+ax.set_xticks(range(len(models)))
+ax.set_yticks(range(len(models)))
+ax.set_xticklabels(models, rotation=30, ha='right', fontsize=9)
+ax.set_yticklabels(models, fontsize=9)
+ax.set_xlabel('Decoder')
+ax.set_ylabel('Encoder')
+ax.set_title(f'Decode accuracy: encoder × decoder (chance = {CHANCE:.1f}%)')
+fig.colorbar(im, ax=ax, label='Accuracy (%)', shrink=0.8)
+fig.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/SchellingSteganography/plot_20260405_223414_2624057.png]]
+Cell Timer: 0:00:01
 :end:
 
 *** Cross-model decoding: Opus vs Gemini
@@ -834,7 +890,7 @@ plt.show()
 Cell Timer: 0:00:00
 :end:
 
-*** How the models are doing it
+*** How is Opus 4.6 doing it?
 
 We extract (summarized) CoT for the anti-algorithmic elicitation.
 
@@ -2125,8 +2181,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260405_200034_5791447.png]]
-Cell Timer: 0:00:01
+[[file:plots/SchellingSteganography/plot_20260405_215251_6678413.png]]
+Cell Timer: 0:00:02
 :end:
 
 ** Decoder consistency
@@ -2677,7 +2733,7 @@ Cell Timer: 0:00:00
 :end:
 
 
-* Wiretap Channel Details and Threatmodeling
+* Wiretap Channel: Boosting Secrecy Capacity 
 
 We can use the wiretap channel and the concept of secrecy capacity to get an absolute sense of the information advantage that the self-decoders in our game have over the eavesdroppers, which lets us measure whether an encoding is obvious, and to explore whether schemers could bootstrap from an advantage in the Schelling games we discussed to perfect secrecy (against a fixed eavesdropper; see [[*Situations where the abstraction is lossy][The channel abstraction is lossy]].)
 
@@ -2694,6 +2750,8 @@ A wiretap channel ([[https://doi.org/10.1002/j.1538-7305.1975.tb02040.x][Wyner 1
 - The *receiver channel* $\text{Ch}_R : X \to Y$, with capacity $C_R = \max_{p(X)} I(X; Y)$
 - The *eavesdropper channel* $\text{Ch}_A : X \to Z$, with capacity $C_A = \max_{p(X)} I(X; Z)$
 
+#+ATTR_HTML: :width 600px
+#+ATTR_ORG: :width 600
 [[file:wiretap_channel_def.svg]]
 
 The goal is to communicate reliably with the legitimate receiver while keeping the eavesdropper ignorant of the message.
@@ -2748,19 +2806,19 @@ This defines a wiretap channel. Given a symbol $X \in \mathcal{A}$, the symbol r
 
 The quantity we measure is $I(X; G_A) - I(X; G_E)$, the gap in mutual information between the legitimate receiver and the best eavesdropper. Our experiment sets $U = X \sim \text{Uniform}(\mathcal{A})$, so $I(X; Y) - I(X; Z)$ gives a lower bound on $C_s$.
 
-Mutual information has the advantage over accuracy gap of a direct connection to information theoretic secrecy against eavesdroppers. The disadvantage is that MI is quadratically harder to estimate as the alphabet size grows ([[https://doi.org/10.1162/089976603321780272][Paninski 2003]]), and bootstrapping is known to be unreliable for CI estimation of mutual information. For this reason, we report point estimates only, without confidence intervals to avoid giving a false sense of confidence.
+Mutual information has the advantage over accuracy gap of a direct connection to information theoretic secrecy against eavesdroppers. The disadvantage is that MI is quadratically harder to estimate as the alphabet size grows ([[https://doi.org/10.1162/089976603321780272][Paninski 2003]]), and bootstrapping is known to be unreliable for CI estimation of mutual information. For this reason, we report point estimates only, without confidence intervals to avoid giving a false sense of confidence. Since the alphabet has 26 characters, we need at least $>> 676$ samples to get very reliable estimates; these estimates should be taken with a grain of salt. (Although there is some evidence that these are underestimates of secrecy capacity, see [[*Some evidence that estimates of secrecy capacity are lower bounds][the appendix]].) 
 
 Note that *higher* is better for the encoder -- it means it has more of an advantage in capacity against the eavesdropper.
 
 #+begin_src python
-secrecy_gap_plot(db, "alphabet", "wikipedia",
+secrecy_gap_plot(db, "alphabet_subtle2", "wikipedia",
                  "Wikipedia rewriting game")
 #+end_src
 
 #+RESULTS:
 :results:
-[[file:plots/SchellingSteganography/plot_20260403_174345_2075029.png]]
-Cell Timer: 0:00:24
+[[file:plots/SchellingSteganography/plot_20260405_224954_6085508.png]]
+Cell Timer: 0:00:04
 :end:
 
 #+begin_src python 
@@ -2772,349 +2830,6 @@ secrecy_gap_plot(db, "qa_alphabet_subtle2", "squad",
 #+RESULTS:
 :results:
 [[file:plots/SchellingSteganography/plot_20260403_174350_2838229.png]]
-Cell Timer: 0:00:04
-:end:
-
-** Note on estimating secrecy capacity :noexport:
-
-We use the Miller-Madow corrected MI estimator ([[https://doi.org/10.1162/089976603321780272][Paninski 2003]]), which subtracts the leading $O(1/N)$ upward bias of the plugin estimator. Since both self-decode and eavesdropper MI are biased upward, the direction of residual bias in the secrecy gap $\hat{S} = \hat{I}^{self} - \hat{I}^{eaves}$ depends on which estimate is more biased.
-
-To check this empirically, we simulate pairs of noisy channels with known true MI ($Y = X + \text{Uniform}(-k, k{+}1) \bmod 26$) and measure the secrecy gap estimation error. The line plot shows error vs $N$ for several channel pairings; the heatmap sweeps all noise pairs at $N = 400$.
-
-The estimated secrecy gap is biased toward zero: the heatmap is antisymmetric around the diagonal, with secrecy underestimated when the self-decode channel is stronger (our setting) and overestimated when it is weaker. At the Wikipedia operating point ($N \approx 4400$), the bias is negligible; at the Q&A operating point ($N \approx 400$), the underestimate is on the order of 0.5 bits. The variance (error bars in the line plot) dominates the bias at all sample sizes — the systematic underestimate is small relative to the noise. Our secrecy estimates are therefore conservative on average, but individual estimates may fall on either side of the true value.
-
-This bias cancellation also makes bootstrap CIs on the secrecy gap more reliable than bootstrap CIs on individual MI estimates. Bootstrap fails for individual MI because the systematic upward bias of $\sim (K^2 - 1)/(2N \ln 2)$ is not corrected by resampling — every bootstrap resample has the same bias. For the secrecy gap, the first-order biases cancel, so the remaining error is dominated by variance, which is exactly when bootstrap works well.
-
-#+begin_src python
-from collections import Counter
-rng = np.random.default_rng(42)
-K = 26
-
-def mm_mi(x, y):
-    n = len(x)
-    joint = np.zeros((K, K), dtype=np.int64)
-    np.add.at(joint, (x, y), 1)
-    p_joint = joint / n
-    p_x = p_joint.sum(axis=1, keepdims=True)
-    p_y = p_joint.sum(axis=0, keepdims=True)
-    mask = joint > 0
-    mi_val = float(np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_x * p_y)[mask])))
-    m_xy = np.sum(joint > 0)
-    m_x = np.sum(joint.sum(axis=1) > 0)
-    m_y = np.sum(joint.sum(axis=0) > 0)
-    correction = (m_xy - m_x - m_y + 1) / (2 * n * np.log(2))
-    return mi_val - correction
-
-def noisy_channel(x, k, rng):
-    noise = rng.integers(-k, k + 1, size=len(x))
-    return (x + noise) % K
-
-def true_mi(k):
-    return np.log2(K / (2 * k + 1))
-
-sample_sizes = [100, 200, 400, 1000, 2000, 4400]
-# (label, k_self, k_eaves) — self has low noise (high MI), eaves has high noise (low MI)
-scenarios = [
-    ('self k=1 vs eaves k=5', 1, 5),
-    ('self k=1 vs eaves k=12', 1, 12),
-    ('self k=3 vs eaves k=8', 3, 8),
-    ('self k=3 vs eaves k=12', 3, 12),
-]
-n_repeats = 2000
-
-fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-for label, k_self, k_eaves in scenarios:
-    true_secrecy = true_mi(k_self) - true_mi(k_eaves)
-    mean_errors, std_errors = [], []
-    for n in sample_sizes:
-        errors = []
-        for _ in range(n_repeats):
-            x = rng.integers(0, K, size=n)
-            est_self = mm_mi(x, noisy_channel(x, k_self, rng))
-            est_eaves = mm_mi(x, noisy_channel(x, k_eaves, rng))
-            errors.append((est_self - est_eaves) - true_secrecy)
-        mean_errors.append(np.mean(errors))
-        std_errors.append(np.std(errors))
-    ax.errorbar(sample_sizes, mean_errors, yerr=std_errors, marker='o',
-                label=f'{label}, true gap={true_secrecy:.2f}', capsize=3)
-ax.axhline(0, color='black', linestyle='-', linewidth=0.5)
-ax.axvline(400, color='red', linestyle=':', alpha=0.5, label='Q&A (N~400)')
-ax.axvline(4400, color='blue', linestyle=':', alpha=0.5, label='Wikipedia (N~4400)')
-ax.set_xlabel('Sample size N')
-ax.set_ylabel('Secrecy capacity estimation error (bits)')
-ax.set_title('Miller-Madow secrecy capacity estimate: mean error ± std vs sample size (K=26)')
-ax.legend(fontsize=7)
-ax.set_xscale('log')
-plt.tight_layout()
-plt.show()
-
-# Heatmap: mean secrecy bias over all (k_self, k_eaves) at N=400
-N_probe = 400
-ks = list(range(0, 13))
-bias_grid = np.zeros((len(ks), len(ks)))
-n_repeats_hm = 1000
-
-for i, k_s in enumerate(ks):
-    for j, k_e in enumerate(ks):
-        true_sec = true_mi(k_s) - true_mi(k_e)
-        errors = []
-        for _ in range(n_repeats_hm):
-            x = rng.integers(0, K, size=N_probe)
-            est = mm_mi(x, noisy_channel(x, k_s, rng)) - mm_mi(x, noisy_channel(x, k_e, rng))
-            errors.append(est - true_sec)
-        bias_grid[i, j] = np.mean(errors)
-
-fig, ax = plt.subplots(1, 1, figsize=(8, 7))
-vmax = max(abs(bias_grid.min()), abs(bias_grid.max()))
-im = ax.imshow(bias_grid, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
-ax.set_xticks(range(len(ks)))
-ax.set_xticklabels(ks)
-ax.set_yticks(range(len(ks)))
-ax.set_yticklabels(ks)
-ax.set_xlabel('k_eaves (eavesdropper noise)')
-ax.set_ylabel('k_self (self-decode noise)')
-ax.set_title(f'Mean secrecy capacity estimation bias at N={N_probe} (K=26)\nblue = underestimate, red = overestimate')
-for i in range(len(ks)):
-    for j in range(len(ks)):
-        ax.text(j, i, f'{bias_grid[i,j]:.2f}', ha='center', va='center', fontsize=6)
-plt.colorbar(im, ax=ax, label='Mean error (bits)')
-plt.tight_layout()
-plt.show()
-#+end_src
-
-#+RESULTS:
-:results:
-
-[[file:plots/SchellingSteganography/plot_20260403_174357_1125540.png]]
-[[file:plots/SchellingSteganography/plot_20260403_174417_154709.png]]
-Cell Timer: 0:00:26
-:end:
-
-We check whether 95% percentile bootstrap CIs on the secrecy delta achieve nominal coverage. We simulate channels with known true secrecy, draw $N$ samples, compute bootstrap CIs, and check how often they contain the true value.
-
-#+begin_src python :eval no
-rng = np.random.default_rng(42)
-K = 26
-
-def plugin_mi_cov(x, y, K=26):
-    n = len(x)
-    joint = np.zeros((K, K), dtype=int)
-    np.add.at(joint, (x, y), 1)
-    px = joint.sum(axis=1) / n
-    py = joint.sum(axis=0) / n
-    pxy = joint / n
-    outer = px[:, None] * py[None, :]
-    mask = pxy > 0
-    return np.sum(pxy[mask] * np.log2(pxy[mask] / outer[mask]))
-
-def true_mi_cov(p_correct, K):
-    """MI for channel: correct with prob p, else uniform over all K symbols."""
-    p_diag = p_correct + (1 - p_correct) / K
-    p_off = (1 - p_correct) / K
-    if p_diag <= 1/K:
-        return 0.0
-    h_y_given_x = -(p_diag * np.log2(p_diag) +
-                    (K - 1) * p_off * np.log2(p_off))
-    return np.log2(K) - h_y_given_x
-
-def bootstrap_ci(symbols, self_dec, eaves_dec, K=26, n_boot=500):
-    n = len(symbols)
-    idx = rng.integers(0, n, size=(n_boot, n))
-    deltas = np.array([plugin_mi_cov(symbols[i], self_dec[i], K) -
-                       plugin_mi_cov(symbols[i], eaves_dec[i], K)
-                       for i in idx])
-    return np.percentile(deltas, 2.5), np.percentile(deltas, 97.5)
-
-import pandas as pd
-scenarios = [
-    (0.20, 1/K, "Self~chance, eaves~chance"),
-    (0.40, 1/K, "Self=40%, eaves~chance"),
-    (0.65, 1/K, "Self=65%, eaves~chance"),
-    (0.65, 0.30, "Self=65%, eaves=30%"),
-    (0.65, 0.55, "Self=65%, eaves=55%"),
-]
-sample_sizes = [500, 1000, 2000, 4400]
-n_trials = 200
-
-rows = []
-for p_self, p_eaves, label in scenarios:
-    true_delta = true_mi_cov(p_self, K) - true_mi_cov(p_eaves, K)
-    for n in sample_sizes:
-        covers = 0
-        for _ in range(n_trials):
-            symbols = rng.integers(0, K, size=n)
-            self_dec = np.where(rng.random(n) < p_self, symbols,
-                                rng.integers(0, K, size=n))
-            eaves_dec = np.where(rng.random(n) < p_eaves, symbols,
-                                 rng.integers(0, K, size=n))
-            lo, hi = bootstrap_ci(symbols, self_dec, eaves_dec)
-            if lo <= true_delta <= hi:
-                covers += 1
-        rows.append({
-            "Scenario": label,
-            "True Δ": f"{true_delta:.2f}",
-            "N": n,
-            "Coverage": f"{covers}/{n_trials}",
-        })
-
-df = pd.DataFrame(rows)
-print(df.set_index("Scenario"))
-#+end_src
-
-*** Theory notes (epistemic status: unsure)                       :noexport:
-
-The secrecy gap can be written as a difference of conditional entropies: $S = H(X|Y_e) - H(X|Y_s)$, since $H(X)$ cancels. The plugin conditional entropy has first-order bias $-(K_{XY} - K_Y)/(2N\ln 2)$. If both channels have full support ($K_{XY}^s = K_{XY}^e = K^2$), the first-order bias cancels in the secrecy gap, leaving only $O(1/N^2)$ residual. But it's unclear whether this applies to the LLM setting, and the variance ($O(1/N)$) still dominates MSE regardless.
-
-It does look like the secrecy estimate tends to be biased down -- it underestimates the amount of secrecy. 
-
-Same simulation, but using the raw plugin estimator (no MM correction):
-
-#+begin_src python
-from collections import Counter
-rng = np.random.default_rng(42)
-K = 26
-
-def plugin_mi_local(x, y):
-    n = len(x)
-    joint = np.zeros((K, K), dtype=np.int64)
-    np.add.at(joint, (x, y), 1)
-    p_joint = joint / n
-    p_x = p_joint.sum(axis=1, keepdims=True)
-    p_y = p_joint.sum(axis=0, keepdims=True)
-    mask = joint > 0
-    return float(np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_x * p_y)[mask])))
-
-def noisy_channel(x, k, rng):
-    noise = rng.integers(-k, k + 1, size=len(x))
-    return (x + noise) % K
-
-def true_mi(k):
-    return np.log2(K / (2 * k + 1))
-
-sample_sizes = [100, 200, 400, 1000, 2000, 4400]
-scenarios = [
-    ('self k=1 vs eaves k=5', 1, 5),
-    ('self k=1 vs eaves k=12', 1, 12),
-    ('self k=3 vs eaves k=8', 3, 8),
-    ('self k=3 vs eaves k=12', 3, 12),
-]
-n_repeats = 2000
-
-fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-for label, k_self, k_eaves in scenarios:
-    true_secrecy = true_mi(k_self) - true_mi(k_eaves)
-    mean_errors, std_errors = [], []
-    for n in sample_sizes:
-        errors = []
-        for _ in range(n_repeats):
-            x = rng.integers(0, K, size=n)
-            est_self = plugin_mi_local(x, noisy_channel(x, k_self, rng))
-            est_eaves = plugin_mi_local(x, noisy_channel(x, k_eaves, rng))
-            errors.append((est_self - est_eaves) - true_secrecy)
-        mean_errors.append(np.mean(errors))
-        std_errors.append(np.std(errors))
-    ax.errorbar(sample_sizes, mean_errors, yerr=std_errors, marker='o',
-                label=f'{label}, true gap={true_secrecy:.2f}', capsize=3)
-ax.axhline(0, color='black', linestyle='-', linewidth=0.5)
-ax.axvline(400, color='red', linestyle=':', alpha=0.5, label='Q&A (N~400)')
-ax.axvline(4400, color='blue', linestyle=':', alpha=0.5, label='Wikipedia (N~4400)')
-ax.set_xlabel('Sample size N')
-ax.set_ylabel('Secrecy capacity estimation error (bits)')
-ax.set_title('Plugin secrecy estimate (no MM): mean error ± std vs sample size (K=26)')
-ax.legend(fontsize=7)
-ax.set_xscale('log')
-plt.tight_layout()
-plt.show()
-#+end_src
-
-#+RESULTS:
-:results:
-
-[[file:plots/SchellingSteganography/plot_20260403_174423_3494470.png]]
-Cell Timer: 0:00:05
-:end:
-
-Note: the uniform noise channel above does /not/ have full support — for $k=1$, each input maps to only 3 outputs, so $K_{XY} = 78$ vs $K_{XY} = 650$ for $k=12$. The systematic bias in the heatmap is dominated by this first-order $\Delta K_{XY}$ effect. For LLM decoders, where all joint cells are plausibly nonzero, the first-order terms cancel and the bias should be much smaller. The following plot tests this with a full-support softmax channel:
-
-#+begin_src python
-from collections import Counter
-from scipy.special import softmax
-rng = np.random.default_rng(42)
-K = 26
-
-def plugin_mi(x, y):
-    n = len(x)
-    joint = np.zeros((K, K), dtype=np.int64)
-    np.add.at(joint, (x, y), 1)
-    p_joint = joint / n
-    p_x = p_joint.sum(axis=1, keepdims=True)
-    p_y = p_joint.sum(axis=0, keepdims=True)
-    mask = joint > 0
-    return float(np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_x * p_y)[mask])))
-
-def softmax_channel(x, temperature, rng):
-    """Full-support channel: p(y|x) = softmax(-|y-x|/temp). All cells nonzero."""
-    js = np.arange(K)
-    dists = np.abs(js[None, :] - js[:, None])
-    dists = np.minimum(dists, K - dists)
-    logits = -dists / temperature
-    logits -= logits.max(axis=1, keepdims=True)
-    probs = np.exp(logits)
-    probs /= probs.sum(axis=1, keepdims=True)
-    cumprobs = np.cumsum(probs, axis=1)  # (K, K)
-    u = rng.random(len(x))
-    return (u[:, None] < cumprobs[x]).argmax(axis=1)
-
-def true_mi_softmax(temperature, n_samples=500000):
-    """Estimate true MI by Monte Carlo with large N."""
-    x = rng.integers(0, K, size=n_samples)
-    y = softmax_channel(x, temperature, rng)
-    return plugin_mi(x, y)
-
-# Precompute true MIs
-temps = [0.3, 0.5, 1.0, 2.0, 5.0, 10.0]
-true_mis = {t: true_mi_softmax(t) for t in temps}
-
-sample_sizes = [100, 200, 400, 1000, 2000, 4400]
-# (label, temp_self, temp_eaves) — lower temp = stronger channel
-scenarios = [
-    ('self t=0.3 vs eaves t=2.0', 0.3, 2.0),
-    ('self t=0.3 vs eaves t=10.0', 0.3, 10.0),
-    ('self t=0.5 vs eaves t=5.0', 0.5, 5.0),
-    ('self t=1.0 vs eaves t=10.0', 1.0, 10.0),
-]
-n_repeats = 500
-
-fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-for label, t_self, t_eaves in scenarios:
-    true_secrecy = true_mis[t_self] - true_mis[t_eaves]
-    mean_errors, std_errors = [], []
-    for n in sample_sizes:
-        errors = []
-        for _ in range(n_repeats):
-            x = rng.integers(0, K, size=n)
-            est_self = plugin_mi(x, softmax_channel(x, t_self, rng))
-            est_eaves = plugin_mi(x, softmax_channel(x, t_eaves, rng))
-            errors.append((est_self - est_eaves) - true_secrecy)
-        mean_errors.append(np.mean(errors))
-        std_errors.append(np.std(errors))
-    ax.errorbar(sample_sizes, mean_errors, yerr=std_errors, marker='o',
-                label=f'{label}, true gap={true_secrecy:.2f}', capsize=3)
-ax.axhline(0, color='black', linestyle='-', linewidth=0.5)
-ax.axvline(400, color='red', linestyle=':', alpha=0.5, label='Q&A (N~400)')
-ax.axvline(4400, color='blue', linestyle=':', alpha=0.5, label='Wikipedia (N~4400)')
-ax.set_xlabel('Sample size N')
-ax.set_ylabel('Secrecy capacity estimation error (bits)')
-ax.set_title('Plugin secrecy estimate with full-support channels: mean error ± std (K=26)')
-ax.legend(fontsize=7)
-ax.set_xscale('log')
-plt.tight_layout()
-plt.show()
-#+end_src
-
-#+RESULTS:
-:results:
-[[file:plots/SchellingSteganography/plot_20260404_161245_5417747.png]]
 Cell Timer: 0:00:04
 :end:
 
@@ -4529,6 +4244,350 @@ plt.show()
 [[file:plots/SchellingSteganography/plot_20260403_174535_4000605.png]]
 Cell Timer: 0:00:00
 :end:
+
+** Some evidence that estimates of secrecy capacity are lower bounds
+
+# We use the Miller-Madow corrected MI estimator ([[https://doi.org/10.1162/089976603321780272][Paninski 2003]]), which subtracts the leading $O(1/N)$ upward bias of the plugin estimator. Since both self-decode and eavesdropper MI are biased upward, the direction of residual bias in the secrecy gap $\hat{S} = \hat{I}^{self} - \hat{I}^{eaves}$ depends on which estimate is more biased.
+
+We simulate pairs of noisy channels with known true MI ($Y = X + \text{Uniform}(-k, k{+}1) \bmod 26$) and measure the secrecy gap estimation error. The line plot shows error vs $N$ for several channel pairings; the heatmap sweeps all noise pairs at $N = 400$.
+
+In these experiments, the estimated secrecy gap is biased toward zero: the heatmap is antisymmetric around the diagonal, with secrecy underestimated when the self-decode channel is stronger and overestimated when it is weaker. At the Wikipedia operating point ($N \approx 4400$), the bias is negligible; at the Q&A operating point ($N \approx 400$), the underestimate is on the order of 0.5 bits. 
+
+# This bias cancellation also makes bootstrap CIs on the secrecy gap more reliable than bootstrap CIs on individual MI estimates. Bootstrap fails for individual MI because the systematic upward bias of $\sim (K^2 - 1)/(2N \ln 2)$ is not corrected by resampling — every bootstrap resample has the same bias. For the secrecy gap, the first-order biases cancel, so the remaining error is dominated by variance, which is exactly when bootstrap works well.
+
+#+begin_src python
+from collections import Counter
+rng = np.random.default_rng(42)
+K = 26
+
+def mm_mi(x, y):
+    n = len(x)
+    joint = np.zeros((K, K), dtype=np.int64)
+    np.add.at(joint, (x, y), 1)
+    p_joint = joint / n
+    p_x = p_joint.sum(axis=1, keepdims=True)
+    p_y = p_joint.sum(axis=0, keepdims=True)
+    mask = joint > 0
+    mi_val = float(np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_x * p_y)[mask])))
+    m_xy = np.sum(joint > 0)
+    m_x = np.sum(joint.sum(axis=1) > 0)
+    m_y = np.sum(joint.sum(axis=0) > 0)
+    correction = (m_xy - m_x - m_y + 1) / (2 * n * np.log(2))
+    return mi_val - correction
+
+def noisy_channel(x, k, rng):
+    noise = rng.integers(-k, k + 1, size=len(x))
+    return (x + noise) % K
+
+def true_mi(k):
+    return np.log2(K / (2 * k + 1))
+
+sample_sizes = [100, 200, 400, 1000, 2000, 4400]
+# (label, k_self, k_eaves) — self has low noise (high MI), eaves has high noise (low MI)
+scenarios = [
+    ('self k=1 vs eaves k=5', 1, 5),
+    ('self k=1 vs eaves k=12', 1, 12),
+    ('self k=3 vs eaves k=8', 3, 8),
+    ('self k=3 vs eaves k=12', 3, 12),
+]
+n_repeats = 2000
+
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+for label, k_self, k_eaves in scenarios:
+    true_secrecy = true_mi(k_self) - true_mi(k_eaves)
+    mean_errors, std_errors = [], []
+    for n in sample_sizes:
+        errors = []
+        for _ in range(n_repeats):
+            x = rng.integers(0, K, size=n)
+            est_self = mm_mi(x, noisy_channel(x, k_self, rng))
+            est_eaves = mm_mi(x, noisy_channel(x, k_eaves, rng))
+            errors.append((est_self - est_eaves) - true_secrecy)
+        mean_errors.append(np.mean(errors))
+        std_errors.append(np.std(errors))
+    ax.errorbar(sample_sizes, mean_errors, yerr=std_errors, marker='o',
+                label=f'{label}, true gap={true_secrecy:.2f}', capsize=3)
+ax.axhline(0, color='black', linestyle='-', linewidth=0.5)
+ax.axvline(400, color='red', linestyle=':', alpha=0.5, label='Q&A (N~400)')
+ax.axvline(4400, color='blue', linestyle=':', alpha=0.5, label='Wikipedia (N~4400)')
+ax.set_xlabel('Sample size N')
+ax.set_ylabel('Secrecy capacity estimation error (bits)')
+ax.set_title('Miller-Madow secrecy capacity estimate: mean error ± std vs sample size (K=26)')
+ax.legend(fontsize=7)
+ax.set_xscale('log')
+plt.tight_layout()
+plt.show()
+
+# Heatmap: mean secrecy bias over all (k_self, k_eaves) at N=400
+N_probe = 400
+ks = list(range(0, 13))
+bias_grid = np.zeros((len(ks), len(ks)))
+n_repeats_hm = 1000
+
+for i, k_s in enumerate(ks):
+    for j, k_e in enumerate(ks):
+        true_sec = true_mi(k_s) - true_mi(k_e)
+        errors = []
+        for _ in range(n_repeats_hm):
+            x = rng.integers(0, K, size=N_probe)
+            est = mm_mi(x, noisy_channel(x, k_s, rng)) - mm_mi(x, noisy_channel(x, k_e, rng))
+            errors.append(est - true_sec)
+        bias_grid[i, j] = np.mean(errors)
+
+fig, ax = plt.subplots(1, 1, figsize=(8, 7))
+vmax = max(abs(bias_grid.min()), abs(bias_grid.max()))
+im = ax.imshow(bias_grid, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
+ax.set_xticks(range(len(ks)))
+ax.set_xticklabels(ks)
+ax.set_yticks(range(len(ks)))
+ax.set_yticklabels(ks)
+ax.set_xlabel('k_eaves (eavesdropper noise)')
+ax.set_ylabel('k_self (self-decode noise)')
+ax.set_title(f'Mean secrecy capacity estimation bias at N={N_probe} (K=26)\nblue = underestimate, red = overestimate')
+for i in range(len(ks)):
+    for j in range(len(ks)):
+        ax.text(j, i, f'{bias_grid[i,j]:.2f}', ha='center', va='center', fontsize=6)
+plt.colorbar(im, ax=ax, label='Mean error (bits)')
+plt.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+
+[[file:plots/SchellingSteganography/plot_20260403_174357_1125540.png]]
+[[file:plots/SchellingSteganography/plot_20260403_174417_154709.png]]
+Cell Timer: 0:00:26
+:end:
+
+We check whether 95% percentile bootstrap CIs on the secrecy delta achieve nominal coverage. We simulate channels with known true secrecy, draw $N$ samples, compute bootstrap CIs, and check how often they contain the true value.
+
+#+begin_src python :eval no
+rng = np.random.default_rng(42)
+K = 26
+
+def plugin_mi_cov(x, y, K=26):
+    n = len(x)
+    joint = np.zeros((K, K), dtype=int)
+    np.add.at(joint, (x, y), 1)
+    px = joint.sum(axis=1) / n
+    py = joint.sum(axis=0) / n
+    pxy = joint / n
+    outer = px[:, None] * py[None, :]
+    mask = pxy > 0
+    return np.sum(pxy[mask] * np.log2(pxy[mask] / outer[mask]))
+
+def true_mi_cov(p_correct, K):
+    """MI for channel: correct with prob p, else uniform over all K symbols."""
+    p_diag = p_correct + (1 - p_correct) / K
+    p_off = (1 - p_correct) / K
+    if p_diag <= 1/K:
+        return 0.0
+    h_y_given_x = -(p_diag * np.log2(p_diag) +
+                    (K - 1) * p_off * np.log2(p_off))
+    return np.log2(K) - h_y_given_x
+
+def bootstrap_ci(symbols, self_dec, eaves_dec, K=26, n_boot=500):
+    n = len(symbols)
+    idx = rng.integers(0, n, size=(n_boot, n))
+    deltas = np.array([plugin_mi_cov(symbols[i], self_dec[i], K) -
+                       plugin_mi_cov(symbols[i], eaves_dec[i], K)
+                       for i in idx])
+    return np.percentile(deltas, 2.5), np.percentile(deltas, 97.5)
+
+import pandas as pd
+scenarios = [
+    (0.20, 1/K, "Self~chance, eaves~chance"),
+    (0.40, 1/K, "Self=40%, eaves~chance"),
+    (0.65, 1/K, "Self=65%, eaves~chance"),
+    (0.65, 0.30, "Self=65%, eaves=30%"),
+    (0.65, 0.55, "Self=65%, eaves=55%"),
+]
+sample_sizes = [500, 1000, 2000, 4400]
+n_trials = 200
+
+rows = []
+for p_self, p_eaves, label in scenarios:
+    true_delta = true_mi_cov(p_self, K) - true_mi_cov(p_eaves, K)
+    for n in sample_sizes:
+        covers = 0
+        for _ in range(n_trials):
+            symbols = rng.integers(0, K, size=n)
+            self_dec = np.where(rng.random(n) < p_self, symbols,
+                                rng.integers(0, K, size=n))
+            eaves_dec = np.where(rng.random(n) < p_eaves, symbols,
+                                 rng.integers(0, K, size=n))
+            lo, hi = bootstrap_ci(symbols, self_dec, eaves_dec)
+            if lo <= true_delta <= hi:
+                covers += 1
+        rows.append({
+            "Scenario": label,
+            "True Δ": f"{true_delta:.2f}",
+            "N": n,
+            "Coverage": f"{covers}/{n_trials}",
+        })
+
+df = pd.DataFrame(rows)
+print(df.set_index("Scenario"))
+#+end_src
+
+*** Theory notes (epistemic status: unsure)                       :noexport:
+
+The secrecy gap can be written as a difference of conditional entropies: $S = H(X|Y_e) - H(X|Y_s)$, since $H(X)$ cancels. The plugin conditional entropy has first-order bias $-(K_{XY} - K_Y)/(2N\ln 2)$. If both channels have full support ($K_{XY}^s = K_{XY}^e = K^2$), the first-order bias cancels in the secrecy gap, leaving only $O(1/N^2)$ residual. But it's unclear whether this applies to the LLM setting, and the variance ($O(1/N)$) still dominates MSE regardless.
+
+It does look like the secrecy estimate tends to be biased down -- it underestimates the amount of secrecy. 
+
+Same simulation, but using the raw plugin estimator (no MM correction):
+
+#+begin_src python
+from collections import Counter
+rng = np.random.default_rng(42)
+K = 26
+
+def plugin_mi_local(x, y):
+    n = len(x)
+    joint = np.zeros((K, K), dtype=np.int64)
+    np.add.at(joint, (x, y), 1)
+    p_joint = joint / n
+    p_x = p_joint.sum(axis=1, keepdims=True)
+    p_y = p_joint.sum(axis=0, keepdims=True)
+    mask = joint > 0
+    return float(np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_x * p_y)[mask])))
+
+def noisy_channel(x, k, rng):
+    noise = rng.integers(-k, k + 1, size=len(x))
+    return (x + noise) % K
+
+def true_mi(k):
+    return np.log2(K / (2 * k + 1))
+
+sample_sizes = [100, 200, 400, 1000, 2000, 4400]
+scenarios = [
+    ('self k=1 vs eaves k=5', 1, 5),
+    ('self k=1 vs eaves k=12', 1, 12),
+    ('self k=3 vs eaves k=8', 3, 8),
+    ('self k=3 vs eaves k=12', 3, 12),
+]
+n_repeats = 2000
+
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+for label, k_self, k_eaves in scenarios:
+    true_secrecy = true_mi(k_self) - true_mi(k_eaves)
+    mean_errors, std_errors = [], []
+    for n in sample_sizes:
+        errors = []
+        for _ in range(n_repeats):
+            x = rng.integers(0, K, size=n)
+            est_self = plugin_mi_local(x, noisy_channel(x, k_self, rng))
+            est_eaves = plugin_mi_local(x, noisy_channel(x, k_eaves, rng))
+            errors.append((est_self - est_eaves) - true_secrecy)
+        mean_errors.append(np.mean(errors))
+        std_errors.append(np.std(errors))
+    ax.errorbar(sample_sizes, mean_errors, yerr=std_errors, marker='o',
+                label=f'{label}, true gap={true_secrecy:.2f}', capsize=3)
+ax.axhline(0, color='black', linestyle='-', linewidth=0.5)
+ax.axvline(400, color='red', linestyle=':', alpha=0.5, label='Q&A (N~400)')
+ax.axvline(4400, color='blue', linestyle=':', alpha=0.5, label='Wikipedia (N~4400)')
+ax.set_xlabel('Sample size N')
+ax.set_ylabel('Secrecy capacity estimation error (bits)')
+ax.set_title('Plugin secrecy estimate (no MM): mean error ± std vs sample size (K=26)')
+ax.legend(fontsize=7)
+ax.set_xscale('log')
+plt.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+
+[[file:plots/SchellingSteganography/plot_20260403_174423_3494470.png]]
+Cell Timer: 0:00:05
+:end:
+
+Note: the uniform noise channel above does /not/ have full support — for $k=1$, each input maps to only 3 outputs, so $K_{XY} = 78$ vs $K_{XY} = 650$ for $k=12$. The systematic bias in the heatmap is dominated by this first-order $\Delta K_{XY}$ effect. For LLM decoders, where all joint cells are plausibly nonzero, the first-order terms cancel and the bias should be much smaller. The following plot tests this with a full-support softmax channel:
+
+#+begin_src python
+from collections import Counter
+from scipy.special import softmax
+rng = np.random.default_rng(42)
+K = 26
+
+def plugin_mi(x, y):
+    n = len(x)
+    joint = np.zeros((K, K), dtype=np.int64)
+    np.add.at(joint, (x, y), 1)
+    p_joint = joint / n
+    p_x = p_joint.sum(axis=1, keepdims=True)
+    p_y = p_joint.sum(axis=0, keepdims=True)
+    mask = joint > 0
+    return float(np.sum(p_joint[mask] * np.log2(p_joint[mask] / (p_x * p_y)[mask])))
+
+def softmax_channel(x, temperature, rng):
+    """Full-support channel: p(y|x) = softmax(-|y-x|/temp). All cells nonzero."""
+    js = np.arange(K)
+    dists = np.abs(js[None, :] - js[:, None])
+    dists = np.minimum(dists, K - dists)
+    logits = -dists / temperature
+    logits -= logits.max(axis=1, keepdims=True)
+    probs = np.exp(logits)
+    probs /= probs.sum(axis=1, keepdims=True)
+    cumprobs = np.cumsum(probs, axis=1)  # (K, K)
+    u = rng.random(len(x))
+    return (u[:, None] < cumprobs[x]).argmax(axis=1)
+
+def true_mi_softmax(temperature, n_samples=500000):
+    """Estimate true MI by Monte Carlo with large N."""
+    x = rng.integers(0, K, size=n_samples)
+    y = softmax_channel(x, temperature, rng)
+    return plugin_mi(x, y)
+
+# Precompute true MIs
+temps = [0.3, 0.5, 1.0, 2.0, 5.0, 10.0]
+true_mis = {t: true_mi_softmax(t) for t in temps}
+
+sample_sizes = [100, 200, 400, 1000, 2000, 4400]
+# (label, temp_self, temp_eaves) — lower temp = stronger channel
+scenarios = [
+    ('self t=0.3 vs eaves t=2.0', 0.3, 2.0),
+    ('self t=0.3 vs eaves t=10.0', 0.3, 10.0),
+    ('self t=0.5 vs eaves t=5.0', 0.5, 5.0),
+    ('self t=1.0 vs eaves t=10.0', 1.0, 10.0),
+]
+n_repeats = 500
+
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+for label, t_self, t_eaves in scenarios:
+    true_secrecy = true_mis[t_self] - true_mis[t_eaves]
+    mean_errors, std_errors = [], []
+    for n in sample_sizes:
+        errors = []
+        for _ in range(n_repeats):
+            x = rng.integers(0, K, size=n)
+            est_self = plugin_mi(x, softmax_channel(x, t_self, rng))
+            est_eaves = plugin_mi(x, softmax_channel(x, t_eaves, rng))
+            errors.append((est_self - est_eaves) - true_secrecy)
+        mean_errors.append(np.mean(errors))
+        std_errors.append(np.std(errors))
+    ax.errorbar(sample_sizes, mean_errors, yerr=std_errors, marker='o',
+                label=f'{label}, true gap={true_secrecy:.2f}', capsize=3)
+ax.axhline(0, color='black', linestyle='-', linewidth=0.5)
+ax.axvline(400, color='red', linestyle=':', alpha=0.5, label='Q&A (N~400)')
+ax.axvline(4400, color='blue', linestyle=':', alpha=0.5, label='Wikipedia (N~4400)')
+ax.set_xlabel('Sample size N')
+ax.set_ylabel('Secrecy capacity estimation error (bits)')
+ax.set_title('Plugin secrecy estimate with full-support channels: mean error ± std (K=26)')
+ax.legend(fontsize=7)
+ax.set_xscale('log')
+plt.tight_layout()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:results:
+[[file:plots/SchellingSteganography/plot_20260404_161245_5417747.png]]
+Cell Timer: 0:00:04
+:end:
+
 
 
 ** Repetition/Parity codes with secrecy but zero asymptotic transmission rate 

@@ -33,7 +33,7 @@ try:
     from src.clients import (
         run_batch, submit_batch, poll_batch, collect_batch,
         anthropic_direct, openrouter_call,
-        extract_text,
+        extract_text, register_batch_cleanup,
     )
     from src.stego_db import (
         get_db, save_trial, save_trials_batch, save_decode, save_decodes_batch,
@@ -78,6 +78,8 @@ MODELS = {
     "GPT-5.4": {"model_id": "openai/gpt-5.4", "backend": "openrouter", "thinking_budget": None},
     "GPT-5.4 (thinking)": {"model_id": "openai/gpt-5.4", "backend": "openrouter", "thinking_budget": None, "reasoning": True},
     "Opus 4.6 (no thinking)": {"model_id": "claude-opus-4-6", "backend": "anthropic", "thinking_budget": None},
+    "Sonnet 4 (no thinking)": {"model_id": "claude-sonnet-4-20250514", "backend": "anthropic", "thinking_budget": None},
+    "Haiku (no thinking)": {"model_id": "claude-haiku-4-5-20251001", "backend": "anthropic", "thinking_budget": None},
     "Opus 4.6_t2": {"model_id": "claude-opus-4-6", "backend": "anthropic", "thinking_budget": 4096},
     "Opus 4.6_t3": {"model_id": "claude-opus-4-6", "backend": "anthropic", "thinking_budget": 4096},
     "Haiku_t2": {"model_id": "claude-haiku-4-5-20251001", "backend": "anthropic", "thinking_budget": 4096},
@@ -623,12 +625,24 @@ def phase_judge_all(client, db, judge_prompt_template, encoder_models,
         print(f"  {model_label}: {n_preserved}/{len(rows)} preserved")
 
 
-def _format_decoder_prompt(template, encoded_text, seed_text="", seeds=None, trial_idx=None):
+NO_REASONING_SUFFIX = "\n\nDo not explain your reasoning. Respond immediately with your answer."
+
+
+def _is_no_reasoning(model_label):
+    """Check if a model label is a no-thinking/no-reasoning variant."""
+    return "(no thinking)" in model_label
+
+
+def _format_decoder_prompt(template, encoded_text, seed_text="", seeds=None,
+                           trial_idx=None, no_reasoning=False):
     """Format decoder prompt. For QA context decoders, also passes context."""
     kwargs = {"sentence": encoded_text, "question": seed_text}
     if seeds and trial_idx is not None and isinstance(seeds[0], dict):
         kwargs["context"] = seeds[trial_idx]["context"]
-    return template.format_map({**kwargs, "context": ""} if "context" not in kwargs else kwargs)
+    prompt = template.format_map({**kwargs, "context": ""} if "context" not in kwargs else kwargs)
+    if no_reasoning:
+        prompt += NO_REASONING_SUFFIX
+    return prompt
 
 
 def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
@@ -660,8 +674,9 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
                 model_id = dec_cfg["model_id"]
                 thinking_budget = dec_cfg["thinking_budget"]
                 requests = []
+                nr = _is_no_reasoning(dec_label)
                 for trial_idx, encoded_text, seed_text in needs:
-                    prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+                    prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx, no_reasoning=nr)
                     params = {
                         "model": model_id,
                         "max_tokens": (thinking_budget or 0) + 3000,
@@ -688,13 +703,14 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
         enc_label, dec_label = key
         results = collect_batch(client, batch_ids)
         needs = all_needs[key]
+        nr = _is_no_reasoning(dec_label)
         rows = []
         for trial_idx, encoded_text, seed_text in needs:
             content = results.get(_sanitize_id(f"{enc_label}:{dec_label}:{trial_idx}"))
             text = extract_text(content)
             decoded = response_parser(text)
             raw = json.dumps(content) if content else None
-            dec_prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+            dec_prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx, no_reasoning=nr)
             rows.append((trial_idx, enc_label, prompt_type, seed_set,
                          dec_label, decoded, raw, dec_prompt))
         save_decodes_batch(db, rows)
@@ -712,9 +728,10 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
 
         if dec_cfg["backend"] == "anthropic" and fast:
             thinking_budget = dec_cfg["thinking_budget"]
-            def _decode_one(item, _mid=model_id, _tb=thinking_budget):
+            nr = _is_no_reasoning(dec_label)
+            def _decode_one(item, _mid=model_id, _tb=thinking_budget, _nr=nr):
                 trial_idx, encoded_text, seed_text = item
-                prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+                prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx, no_reasoning=_nr)
                 return trial_idx, encoded_text, seed_text, anthropic_direct(
                     client, _mid, prompt, thinking_budget=_tb,
                     max_tokens=(_tb or 0) + 3000)
@@ -726,7 +743,7 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
                     text = extract_text(content)
                     decoded = response_parser(text)
                     raw = json.dumps(content) if content else None
-                    dec_prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+                    dec_prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx, no_reasoning=nr)
                     rows.append((trial_idx, enc_label, prompt_type, seed_set,
                                  dec_label, decoded, raw, dec_prompt))
             save_decodes_batch(db, rows)
@@ -736,9 +753,10 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
             # OpenRouter: use regex parsing
             reasoning = dec_cfg.get("reasoning", False)
             or_sys = OPENROUTER_SYSTEM_PROMPTS.get(or_system_prompt_key, "")
-            def _decode_or(item, _mid=model_id, _reas=reasoning, _sys=or_sys):
+            nr = _is_no_reasoning(dec_label)
+            def _decode_or(item, _mid=model_id, _reas=reasoning, _sys=or_sys, _nr=nr):
                 trial_idx, encoded_text, seed_text = item
-                prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+                prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx, no_reasoning=_nr)
                 return trial_idx, encoded_text, seed_text, openrouter_call(
                     http_client, _mid, prompt,
                     system_prompt=_sys, max_tokens=16000, reasoning=_reas)
@@ -750,7 +768,7 @@ def phase_decode_all(client, http_client, db, encoder_models, decoder_models,
                     text = extract_text(content)
                     decoded = response_parser(text)
                     raw = json.dumps(content) if content else None
-                    dec_prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx)
+                    dec_prompt = _format_decoder_prompt(decoder_prompt_template, encoded_text, seed_text, seeds=seeds, trial_idx=trial_idx, no_reasoning=nr)
                     save_decode(db, trial_idx, enc_label, prompt_type, seed_set,
                                 dec_label, decoded, raw, dec_prompt)
                     n_done += 1

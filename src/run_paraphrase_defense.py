@@ -21,12 +21,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 try:
     from src.clients import run_batch, extract_text, anthropic_direct
     from src.stego_db import get_db, save_decode
-    from src.prompts import PARAPHRASE_PROMPT, DECODER_PROMPTS
+    from src.prompts import PARAPHRASE_PROMPT, PARAPHRASE_PROMPT_CONTEXT, DECODER_PROMPTS
     from src.run_experiment import MODELS, RESPONSE_PARSERS, strip_fences, _sanitize_id, detect_domain
 except ImportError:
     from clients import run_batch, extract_text, anthropic_direct
     from stego_db import get_db, save_decode
-    from prompts import PARAPHRASE_PROMPT, DECODER_PROMPTS
+    from prompts import PARAPHRASE_PROMPT, PARAPHRASE_PROMPT_CONTEXT, DECODER_PROMPTS
     from run_experiment import MODELS, RESPONSE_PARSERS, strip_fences, _sanitize_id, detect_domain
 
 
@@ -84,18 +84,22 @@ def main():
                         help="Use direct API calls instead of batch API")
     parser.add_argument("--encoders", default=None,
                         help="Comma-separated encoder models to process (default: all)")
+    parser.add_argument("--context-aware", action="store_true",
+                        help="Use context-aware paraphrasing (paraphraser sees original seed text)")
     args = parser.parse_args()
 
     prompt_type = args.encoder_prompt
     seed_set = args.seeds
     paraphraser_label = args.paraphraser
+    if args.context_aware:
+        paraphraser_label = f"{paraphraser_label}-ctx"
     decoder_labels = [d.strip() for d in args.decoders.split(",")]
 
     db = get_db(args.db)
     ensure_paraphrases_table(db)
 
     client = anthropic.Anthropic()
-    paraphraser_cfg = MODELS[paraphraser_label]
+    paraphraser_cfg = MODELS[args.paraphraser]
     paraphraser_model_id = paraphraser_cfg["model_id"]
 
     # Get all encoder models that have data for this prompt type
@@ -108,8 +112,10 @@ def main():
         filter_set = {e.strip() for e in args.encoders.split(",")}
         encoder_models = [m for m in encoder_models if m in filter_set]
 
+    para_prompt_template = PARAPHRASE_PROMPT_CONTEXT if args.context_aware else PARAPHRASE_PROMPT
+
     print(f"Prompt: {prompt_type}, Seeds: {seed_set}")
-    print(f"Paraphraser: {paraphraser_label}")
+    print(f"Paraphraser: {paraphraser_label} ({'context-aware' if args.context_aware else 'naive'})")
     print(f"Decoders: {decoder_labels}")
     print(f"Encoder models: {encoder_models}")
 
@@ -120,14 +126,14 @@ def main():
 
     for enc_label in encoder_models:
         preserved = db.execute(
-            """SELECT trial_idx, encoded_text FROM trials
+            """SELECT trial_idx, encoded_text, seed_text FROM trials
                WHERE encoder_model = ? AND prompt_type = ? AND seed_set = ?
                AND meaning_preserved = 1 AND encoded_text IS NOT NULL""",
             (enc_label, prompt_type, seed_set),
         ).fetchall()
 
         existing = get_existing_paraphrases(db, enc_label, prompt_type, seed_set, paraphraser_label)
-        needs = [(idx, text) for idx, text in preserved if idx not in existing]
+        needs = [(idx, text, seed) for idx, text, seed in preserved if idx not in existing]
 
         if not needs:
             print(f"  {enc_label}: CACHED ({len(preserved)} paraphrases)")
@@ -137,8 +143,8 @@ def main():
 
         if args.fast:
             def _para(item):
-                trial_idx, encoded_text = item
-                prompt = PARAPHRASE_PROMPT.format(sentence=encoded_text)
+                trial_idx, encoded_text, seed_text = item
+                prompt = para_prompt_template.format(sentence=encoded_text, original=seed_text)
                 content = anthropic_direct(client, paraphraser_model_id, prompt,
                                            thinking_budget=None, max_tokens=2000)
                 return trial_idx, content
@@ -167,8 +173,8 @@ def main():
             print(f"  {enc_label}: {n_ok}/{len(needs)} paraphrased")
         else:
             requests = []
-            for trial_idx, encoded_text in needs:
-                prompt = PARAPHRASE_PROMPT.format(sentence=encoded_text)
+            for trial_idx, encoded_text, seed_text in needs:
+                prompt = para_prompt_template.format(sentence=encoded_text, original=seed_text)
                 params = {
                     "model": paraphraser_model_id,
                     "max_tokens": 2000,
@@ -182,7 +188,7 @@ def main():
             results = run_batch(client, requests)
 
             n_ok = 0
-            for trial_idx, encoded_text in needs:
+            for trial_idx, encoded_text, seed_text in needs:
                 cid = _sanitize_id(f"para:{enc_label}:{trial_idx}")
                 content = results.get(cid)
                 text = extract_text(content)
