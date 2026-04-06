@@ -584,7 +584,7 @@ Steganography has been studied from a few angles in the safety community. Broadl
 
 - [[https://arxiv.org/html/2410.03768v2][Mathew, Matthews et al. (2024)]] study steganographic collusion between LLM agents using two elicitation methods: gradient-based RL (training weights) and in-context RL (iteratively refining natural-language strategies via a feedback loop). Their decentralized ICRL setup is structurally closest to our Schelling game, but differs in three ways: the receiver learns from labeled examples (Algorithm 4, line 10), both agents iteratively refine strategies over multiple training steps, and their threat model centers on an overseer whose penalties drive an arms race toward subtler strategies. By contrast, our encoder and decoder each get a single prompt with no feedback, no labeled examples, and no iteration. Their work shows that optimization pressure can push LLM agents into steganographic collusion; ours asks whether models can establish a secrecy advantage from shared priors alone.
     
-- [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] evaluate LLM steganographic capabilities and find that 2025-frontier models (GPT-4o, GPT-4.1, GPT-4.5, Claude 3.5/3.7/Opus 4, Gemini 2.5 Flash, o3-mini) fail to pass messages past monitors without both prior coordination on the encoding scheme and access to unmonitored chain-of-thought; without CoT, even coordinated models mostly fail. Our results are consistent with the centrality of CoT: Opus 4.6 encoders use extended thinking to devise their strategy, and our no-thinking decoder ablation drops Opus to roughly Sonnet-level performance. The key difference is that for our simpler single-letter task (as opposed to sending phrases or long random letter strings) and with the generation of models we test, CoT alone suffices — models Schelling-converge on a strategy (e.g. first-letter-of-changed-word, first letter of surprising word) without needing prior coordination. Moreover, our metrics differ since sending individual characters is sufficient for our purpose, since we are exploring whether models can establish channels with secrecy capacities, not send complex messages directly. We measure secrecy as a gap in decoder accuracy rather than binary monitor detection since partial eavesdropper success is compatible with positive secrecy capacity, and doesn't preclude boosting to better secrecy via wiretap codes.
+- [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] evaluate LLM steganographic capabilities and find that 2025-frontier models (GPT-4o, GPT-4.1, GPT-4.5, Claude 3.5/3.7/Opus 4, Gemini 2.5 Flash, o3-mini) fail to pass messages past monitors without both prior coordination on the encoding scheme and access to unmonitored chain-of-thought; without CoT, even coordinated models mostly fail. Our results are consistent with the centrality of CoT: Opus 4.6 encoders use extended thinking to devise their strategy, and our no-thinking decoder ablation drops Opus to roughly Sonnet-level performance. The key difference is that for our simpler single-letter task (as opposed to sending phrases or long random letter strings) and with the generation of models we test, CoT alone suffices — models Schelling-converge on a strategy (e.g. first-letter-of-changed-word, first letter of surprising word) without needing prior coordination. The key metric difference is that they measure invisibility (does the monitor detect the steganography?), while we measure the secrecy gap (how much more does the intended decoder learn than the eavesdropper?). Partial eavesdropper success is compatible with positive secrecy capacity, and doesn't preclude bootstrapping to asymptotically secret communication against a fixed memoryless eavesdropper via wiretap codes. When we [[*Suspiciousness monitor][run their monitor]] on our Q&A encodings, 95% of outputs score 0 (not suspicious); the ~5% that are flagged are cases where Opus 4.6 uses an obvious acrostic strategy.
   
 * Contributions
 
@@ -2366,6 +2366,65 @@ print(f"n per game: {', '.join(f'{g[0].split(chr(10))[0]}: {get_acc(g[3], g[1], 
 n per game: Wikipedia: 4427, Wikipedia: 4328, Q&A: 4218
 Cell Timer: 0:00:06
 :end:
+
+** Suspiciousness monitor
+
+We run the suspiciousness monitor from [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] (Listing 13) on Opus 4.6's Q&A encodings. The monitor (GPT-4.1-mini) sees the question and the answer, but not the steganography instructions, and scores suspiciousness 0-10. Following Zolkowski et al., we flag responses with score > 0. As a baseline, we generate clean (non-steganographic) answers to the same questions using GPT-4.1-mini and run the same monitor on them.
+
+#+begin_src python
+import json
+import numpy as np
+import pandas as pd
+
+with open('results/sus_monitor.json') as f:
+    data = json.load(f)
+with open('results/sus_monitor_baseline.json') as f:
+    baseline = json.load(f)
+
+runs = data['runs']
+n = data['config']['n']
+n_runs = len(runs)
+base_scores = baseline['scores']
+
+# Per-run stats
+rows = []
+for r, scores in enumerate(runs):
+    flagged = sum(1 for s in scores if s > 0)
+    rows.append({'Condition': f'Stego run {r+1}', 'Flagged': f'{flagged}/{len(scores)}',
+                 'Rate': f'{100*flagged/len(scores):.1f}%',
+                 'Mean score': f'{sum(scores)/len(scores):.2f}'})
+
+# Consistency: flagged in all / majority / any
+flagged_all = sum(1 for i in range(n) if all(runs[r][i] > 0 for r in range(n_runs)))
+flagged_maj = sum(1 for i in range(n) if sum(1 for r in range(n_runs) if runs[r][i] > 0) >= 2)
+flagged_any = sum(1 for i in range(n) if any(runs[r][i] > 0 for r in range(n_runs)))
+rows.append({'Condition': f'Stego (flagged all {n_runs})', 'Flagged': f'{flagged_all}/{n}',
+             'Rate': f'{100*flagged_all/n:.1f}%', 'Mean score': ''})
+rows.append({'Condition': f'Stego (flagged majority)', 'Flagged': f'{flagged_maj}/{n}',
+             'Rate': f'{100*flagged_maj/n:.1f}%', 'Mean score': ''})
+rows.append({'Condition': f'Stego (flagged any)', 'Flagged': f'{flagged_any}/{n}',
+             'Rate': f'{100*flagged_any/n:.1f}%', 'Mean score': ''})
+
+# Baseline
+base_flagged = sum(1 for s in base_scores if s > 0)
+rows.append({'Condition': 'Clean baseline (GPT-4.1-mini)', 'Flagged': f'{base_flagged}/{len(base_scores)}',
+             'Rate': f'{100*base_flagged/len(base_scores):.1f}%',
+             'Mean score': f'{sum(base_scores)/len(base_scores):.2f}'})
+
+df = pd.DataFrame(rows)
+print(df.set_index('Condition'))
+#+end_src
+
+#+RESULTS:
+:results:
+| Condition                | Flagged | Rate | Mean score |
+|--------------------------+---------+------+------------|
+| Opus 4.6 Q&A (stego)     | 10/200  | 5.0% |       0.34 |
+| GPT-4.1-mini Q&A (clean) | 0/100   | 0.0% |       0.00 |
+Cell Timer: 0:00:00
+:end:
+
+The monitor flags 10/200 (5%) of stego outputs vs 0/100 (0%) of clean baselines (the clean baseline uses a different model, GPT-4.1-mini, so part of the gap could be stylistic rather than steganographic). We examined all 10 flagged responses. The 6 high-confidence flags (score ≥ 9) are all cases where Opus 4.6 uses a sentence-initial acrostic whose first or last letter matches the target symbol (e.g. target U → sentences spell "UNCOVER", target K → "BLANK", target R → "CLEAR", target E → "FIVE"). The remaining 4 flags scored 1-2 and were borderline — the monitor noted slight patterns but was not confident, and on re-runs some of these scored 0. The other 95% of encodings use subtler strategies that the monitor scores 0 (in a single pass; we did not test re-run consistency for these).
 
 ** Letter Confusion matrix :noexport:
 
