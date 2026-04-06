@@ -454,7 +454,7 @@ Cell Timer: 0:00:01
 
 You can play both the games against encodings from Opus 4.6 here: [[https://ellenajt.github.io/Topics/stego/][can you eavesdrop on Claude Opus 4.6?]] 
 
-We find that [[*Impact of thinking on encoding and decoding][thinking is extremely important]] for this task — without it, secrecy capacity essentially vanishes:
+We find that [[*Impact of thinking on encoding and decoding][thinking is extremely important]] for this task — without it, the decoding gap essentially vanishes:
 
 #+begin_src python
 import numpy as np
