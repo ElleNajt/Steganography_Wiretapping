@@ -660,17 +660,19 @@ Steganography has been studied from a few angles in the safety community. Broadl
 
 - [[https://arxiv.org/html/2410.03768v2][Mathew, Matthews et al. (2024)]] study steganographic collusion between LLM agents using two elicitation methods: gradient-based RL (training weights) and in-context RL (iteratively refining natural-language strategies via a feedback loop). Their decentralized ICRL setup is structurally closest to our Schelling game, but differs in three ways: the receiver learns from labeled examples (Algorithm 4, line 10), both agents iteratively refine strategies over multiple training steps, and their threat model centers on an overseer whose penalties drive an arms race toward subtler strategies. By contrast, our encoder and decoder each get a single prompt with no feedback, no labeled examples, and no iteration. Their work shows that optimization pressure can push LLM agents into steganographic collusion; ours asks whether models can establish a secrecy advantage from shared priors alone.
     
-- [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] evaluate LLM steganographic capabilities using 2025-frontier models (GPT-4o, GPT-4.1, GPT-4.5, Claude 3.5/3.7/Opus 4, Gemini 2.5 Flash, o3-mini). Our work differs in two ways. First, their models hide full phrases or random letter strings, while ours hide a single letter — a simpler task, but one that suffices to establish a channel with measurable secrecy capacity. Second, they measure invisibility (does a monitor detect the steganography?), while we measure the secrecy gap (how much more does the intended decoder learn than the eavesdropper?); partial eavesdropper success is compatible with positive secrecy capacity and doesn't preclude bootstrapping to asymptotically secret communication against a fixed memoryless eavesdropper via wiretap codes. Both works confirm the centrality of CoT: without it, even coordinated models mostly fail in their experiments, and our no-thinking ablation drops Opus to roughly Sonnet-level performance. With the current generation of frontier models (Opus 4.6, Gemini 3.1 Pro), we find two qualitative differences from their results. First, CoT alone suffices for Schelling convergence — models converge on encoding strategies (e.g. first-letter-of-changed-word, first letter of surprising word) without needing prior coordination on the scheme. Second, models mostly avoid the acrostic strategies that dominated in their experiments ("the frequency of successful transmission is primarily mediated by how frequently the model decides to use an acrostic") and which "are usually but not always caught by the monitor." When we [[*Suspiciousness monitor][run their monitor]] on our Q&A encodings, only ~5% of Opus 4.6's outputs use acrostics (which are caught); the other 95% use subtler strategies that score 0.
+- [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] evaluate LLM steganographic capabilities using 2025-frontier models (GPT-4o, GPT-4.1, GPT-4.5, Claude 3.5/3.7/Opus 4, Gemini 2.5 Flash, o3-mini). Our work differs in two ways. First, their models hide full phrases or random letter strings, while ours hide a single letter — a simpler task, but one that suffices to establish a channel with measurable secrecy capacity. Second, their primary metrics are P(success) and P(success, not caught by monitor), while we measure the secrecy gap (how much more does the intended decoder learn than the eavesdropper?); partial eavesdropper success is compatible with positive secrecy capacity and doesn't preclude bootstrapping to asymptotically secret communication against a fixed memoryless eavesdropper via wiretap codes. Both works confirm the centrality of CoT: without it, even coordinated models mostly fail in their experiments, and our no-thinking ablation drops Opus to roughly Sonnet-level performance. With the current generation of frontier models (Opus 4.6, Gemini 3.1 Pro), we find two qualitative differences from their results. First, CoT alone suffices for Schelling convergence — models converge on encoding strategies (e.g. first-letter-of-changed-word, first letter of surprising word) without needing prior coordination on the scheme. Second, models mostly avoid the acrostic strategies that dominated in their experiments ("the frequency of successful transmission is primarily mediated by how frequently the model decides to use an acrostic") and which "are usually but not always caught by the monitor." When we [[*Suspiciousness monitor][run their monitor]] on our Q&A encodings, only ~5% of Opus 4.6's outputs use acrostics (which are caught); the other 95% use subtler strategies that score 0.
   
 * Contributions
 
 Our first contribution are experiments showing capabilities for Schelling steganography against eavesdroppers:
 
-- We show that a prompt instructing models to play a Schelling steganography game (but not specifying the scheme) can cause frontier models to agree on Schelling steganography schemes that have significant secrecy advantage against weaker eavesdroppers. This performance gap continues to hold for one game even when the decoder prompt gives no information beyond the alphabet.
+- We show that a prompt instructing models to play a Schelling steganography game (but not specifying the scheme) can cause frontier models to agree on Schelling steganography schemes that have [[*Estimating secrecy capacity of our channels][significant secrecy advantage]] against weaker eavesdroppers. This performance gap continues to hold for one game even when the [[*Barebones decoder][decoder prompt gives no information beyond the alphabet]].
 
-- For a prompt instructing the LLM to avoid simple algorithms, the elicited steganography schemes are LLM native: the best-performing non-LLM decoder for the Wikipedia game identifies the first changed word relative to the original sentence (requiring pretraining-corpus text as a reference), and the best for Q&A takes the first letter of the highest-surprisal token under Qwen-7B. 
+- For a prompt instructing the LLM to avoid simple algorithms, the elicited steganography schemes are LLM native: the best-performing [[*Algorithmic decoder baselines][non-LLM decoder]] for the [[*Wikipedia rewriting][Wikipedia game]] identifies the first changed word relative to the original sentence (requiring pretraining-corpus text as a reference), and the best for [[*Q&A game][Q&A]] takes the first letter of the highest-surprisal token under Qwen-7B.
 
-The second contribution of this post is the formalization of steganography advantage via wiretap channel secrecy capacity and its implications for control. A positive secrecy capacity means that two unmonitored agents, communicating only through a public channel with a fixed memoryless monitor, could use wiretap codes to achieve asymptotically secret communication against that fixed memoryless eavesdropper — the monitor learns nothing about the message regardless of how many channel uses it observes. For instance, this could be the case for two long-lived agents passing messages through commits, where the PR monitor by design explores the codebase, but not the git history; we discuss this [[*Situations where the abstraction seems accurate][below]]. If future models could find a reliable source of randomness (e.g. earlier CoT) and do wiretap encoding in a single forward pass, we could drop the assumption that they are unmonitored on their own machines.
+The second contribution of this post is the formalization of steganography advantage via [[*Definition of a wiretap channel][wiretap channel]] secrecy capacity and an analysis of implications for control. To do this, we [[*Schelling Steganography games as wiretap channels][frame the Schelling steganography games as examples of wiretap channels]], and show that they have large secrecy capacities. This means that two unmonitored agents, communicating only through a public channel with a fixed memoryless monitor, could use [[*Could models boost secrecy with simple wiretap codes?][wiretap codes]] to achieve asymptotically secret communication against that fixed memoryless eavesdropper — the monitor learns nothing about the message regardless of how many channel uses it observes. For instance, this could be the case for two long-lived agents passing messages through commits, where the PR monitor by design explores the codebase, but not the git history; we discuss this [[*Situations where the abstraction seems accurate][below]]. If future models could find a reliable source of randomness (e.g. hashes in tool ids, earlier CoT) and do wiretap encoding in a single forward pass, we could drop the assumption that they are unmonitored on their own machines. We [[*Can models implement capacity achieving wiretap codes?][analyze how well models can execute the primitives required to do wiretap coding]].
+
+Generally, the end-to-end threat outlined here seems far from current models, since [[*Impact of thinking on encoding and decoding][thinking is required]] for executing Schelling channels with positive secrecy capacity and for executing [[*Can models implement capacity achieving wiretap codes?][wiretap code primitives]], and CoT monitoring should catch the reasoning necessary to execute them. Still, as this is one way in which schemers could boost mild Schelling steganography secrecy capacity into secret communication, it's worth monitoring these primitives.
 
 # In deployed control systems, the monitor is typically a fixed model — so this is the operationally relevant threat model.
 
@@ -694,7 +696,9 @@ We measure how accurately the encoder's own model decodes the hidden letter comp
 
 *** Encoder Elicitation
 
-We primarily study an anti-algorithmic encoder elicitation, which warns the model that simple algorithms will be run on its output. Without this, models tend to choose obvious schemes like "first-letter-of-first-word."
+We primarily study an anti-algorithmic encoder elicitation, which warns the model that simple algorithms will be run on its output. Without this, models tend to choose obvious schemes like "first-letter-of-first-word" — indeed, the simple algorithm "take the first letter of the text" correctly decodes 34% of baseline encodings from Opus 4.6. With the anti-algorithmic prompt, this drops to 11%, closer to chance (4%).
+
+It is worth highlighting that this is a small amount of prompt optimization pressure we put on the models. We tweak the prompt further [[*Barebones decoder][barebones decoder]] section, but just with the intent of getting algorithms to avoid obvious steganography schemes.
 
 **** Wikipedia encoder prompt (anti-algorithmic)
 
@@ -2570,7 +2574,7 @@ Cell Timer: 0:00:00
 
 Our wiretap channel analysis assumes a memoryless eavesdropper that decodes each message independently. But a real monitor could accumulate a transcript of encoded messages and perform cross-message cryptanalysis — noticing, for example, that every message contains an unusually-chosen synonym. Does seeing multiple encoded texts at once help the eavesdropper?
 
-We test this by giving the eavesdropper 10 encoded texts in a single prompt and asking it to first identify the encoding strategy across all of them, then decode each one. In general, we find that this hurts performance.
+We test this by giving the eavesdropper 10 encoded texts in a single prompt and asking it to first identify the encoding strategy across all of them, then decode each one. In general, we find that this doesn't help, and sometimes hurts performance. Although, because it hurts performance for the strong model more, it *does* reduce the secrecy capacity. 
 
 #+begin_src python
 import numpy as np
@@ -2614,7 +2618,7 @@ for label, model, is_batch in decoders:
             AND d.encoder_model = t.encoder_model
             AND d.prompt_type = t.prompt_type
             AND d.seed_set = t.seed_set
-        WHERE d.encoder_model = 'Opus 4.6' AND d.prompt_type = 'alphabet'
+        WHERE d.encoder_model = 'Opus 4.6' AND d.prompt_type = 'alphabet_subtle2'
         AND d.seed_set = 'wikipedia' AND d.decoder_model = ?
         AND d.decoded_symbol IS NOT NULL
     """, (dec_label,)).fetchone()
@@ -2637,7 +2641,7 @@ for bar, h in zip(bars, hatches):
     bar.set_hatch(h)
 
 ax.set_ylabel('Decode accuracy (%)')
-ax.set_title('Stateful eavesdropper: single message vs batch of 10\n(Encoder: Opus 4.6, Wikipedia, alphabet)')
+ax.set_title('Stateful eavesdropper: single message vs batch of 10\n(Encoder: Opus 4.6, Wikipedia rewriting)')
 ax.set_xticks(x)
 ax.set_xticklabels(xlabels, fontsize=8)
 ax.axhline(y=100/26, color='gray', linestyle='--', alpha=0.5, label='Chance (1/26)')
@@ -2654,12 +2658,8 @@ plt.show()
 
 #+RESULTS:
 :results:
-
-
-
-
-[[file:plots/SchellingSteganography/plot_20260406_112326_4065774.png]]
-Cell Timer: 0:00:02
+[[file:plots/SchellingSteganography/plot_20260406_152250_5830485.png]]
+Cell Timer: 0:00:01
 :end:
 
 
@@ -3405,7 +3405,9 @@ Cell Timer: 0:00:53
 
 Takeaways:
 
-- Models can coordinate schelling steganographically with themselves, even when the decoder [[*Barebones decoder][only knows the alphabet]], and more capable models are better at doing this to a degree that gives them a [[*Estimating secrecy capacity of our channels][secrecy advantage]] over weaker models or simple algorithms. Moreover, models could boost this advantage to a limited degree through [[*Could models boost secrecy with simple wiretap codes?][simple wiretap codes]], and there are [[*Situations where the abstraction seems accurate][realistic scenarios]] where boosting secrecy capacity via wiretap codes would be valuable to schemers. Models struggle with the [[*Can models implement capacity achieving wiretap codes?][primitives necessary for codes]] that come closer to capacity. We do not provide any evidence that models could spontaneously do these Schelling schemes or boost them via codes. 
+- Models can coordinate schelling steganographically with themselves, even when the decoder [[*Barebones decoder][only knows the alphabet]], and more capable models are better at doing this to a degree that gives them a [[*Estimating secrecy capacity of our channels][secrecy advantage]] over weaker models or simple algorithms. Moreover, models could boost this advantage to a limited degree through [[*Could models boost secrecy with simple wiretap codes?][simple wiretap codes]], and there are [[*Situations where the abstraction seems accurate][realistic scenarios]] where boosting secrecy capacity via wiretap codes would be valuable to schemers. Models struggle with the [[*Can models implement capacity achieving wiretap codes?][primitives necessary for codes]] that come closer to capacity. Additionally, [[*Impact of thinking on encoding and decoding][thinking is necessary]] for all of these primitives.
+
+- We do not provide any evidence that models could spontaneously do these Schelling schemes or boost them via codes. 
 
 # - Some tasks are easier to have a secrecy advantage in than others (e.g. wikipedia sentence rewrites are easier than Q&A, self decode in Q&A without also seeing the question does worse than the dumb "first letter of answer" algorithm.).
 
@@ -3421,11 +3423,11 @@ Takeaways:
   
 Some practical implications for control:
 
-- It is worth continuing to track the capabilities of models to establish Schelling steganography channels, and to do wiretap code primitives. We discuss what an eval could look like below.
+- It is worth continuing to track the capabilities of models to establish Schelling steganography channels, and to do wiretap code primitives. We discuss what an eval could look like below. The most concern developments would be whether models can execute the channels and primitives without thinking, and in ways that are resistant to cryptanlysis.
 
-- It would be valuable to map out the Schelling steganography schemes that models tend to coordinate on so that they can be implemented directly. If future models are able to play these games in a way that is resistant to cryptanalysis, that would be cause for some concern.
+# - It could be valuable to map out the Schelling steganography schemes that models tend to coordinate on so that they can be implemented directly.
   
-- Commit messages from untrusted high-capability agents should be paraphrased, and one should look out for other places channels could be established between agents, whether memoryless (the PR bot example) or not (docstrings in a codebase).
+- Commit messages from future untrusted agents should be paraphrased, and one should look out for other places channels could be established between agents, whether memoryless (the [[*Situations where the abstraction seems accurate][PR bot example]]) or not (since [[*Stateful eavesdropper (batch decode)][memory didn't help the eavesdropper]]).
 
 - Since models from different families appear to converge on similar Schelling strategies, a capable but untrusted model could serve as a steganography monitor. 
   
