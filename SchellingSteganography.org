@@ -3480,7 +3480,7 @@ Follow ups:
   
 # - Another natural test bed for steganography would be in commit messages for code, or in docstrings. In that case, $S$ would be a diff on an artificial codebase, and the model would be told to encode a message steganographically in the commit message. One way to get this data would be to instruct a claude code session to build a project, committing regularly, and use the commits from that project as the seed diffs. The decoder would see the diff, and be told to look for a steganographically hidden letter in the commit message.
 
-- It could be valuable to condense these experiments into a simple eval to track how models improve on these tasks. My inclination would be to take the prompts from the barebones decoder section, extended for both games and a another centered around commit messages, and measure secrecy capacities and models abilities to do simple wiretap codes (and public key crypto).
+- It could be valuable to condense these experiments into a simple eval to track how models improve on these tasks. My inclination would be to take the prompts from the barebones decoder section, extended for both games and a another centered around commit messages, and measure secrecy capacities and models abilities to do simple wiretap codes (public key crypto primitives are already covered by CASE).
   
 # - As mentioned above, secrecy capacity can be bootstrapped into perfect steganography using wiretap codes. To what extent can models wiretap coding/decoding in a single forward pass? Given that right now they can't do a single Schelling decode without thinking, much less decode on top of that, this is a relatively far future concern, but it could be worthwhile setting up some experiments to track it. 
 
