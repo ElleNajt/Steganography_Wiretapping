@@ -640,7 +640,7 @@ Finally, since thinking appears to be necessary for this task for the current ge
 
 * Authors note:
 
-I have made an effort to appropriately caveat the conditions under which you can boost secrecy capacity into better steganography. The monitor needs to be memoryless, the guarantees are only asymptotic, and either agents need to run tool calls to create wiretap codes (monitorable), or they need to do it in their CoT (also monitorable) or in a forward pass (which current models cannot do). Additionally, executing the codes requires a source of entropy. Additionally, I do not show an end-to-end execution of boosting Steganography via codes, I just show that the primitives (1. Schelling coordinated steganography establishing a channel with secrecy capacity against a weaker monitor, 2. the simplest possible codes, given randomness) can be executed by reasoning models.
+I have made an effort to appropriately caveat the conditions under which you can boost secrecy capacity into better steganography. The monitor needs to be memoryless, the guarantees are only asymptotic, and either agents need to run tool calls to create wiretap codes (monitorable), or they need to do it in their CoT (also monitorable) or in a forward pass (which current models cannot do). Additionally, executing the codes requires a source of entropy. Additionally, I do not show an end-to-end execution of boosting Steganography via codes, I just show that relevant primitives can be executed by reasoning models.
 
 I feel like this is something that people might misinterpret, so I want to make sure this is really clear.
 
