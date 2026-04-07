@@ -662,7 +662,7 @@ Steganography has been studied from a few angles in the safety community. Broadl
     
 - [[https://arxiv.org/html/2410.03768v2][Mathew, Matthews et al. (2024)]] study steganographic collusion between LLM agents using two elicitation methods: gradient-based RL (training weights) and in-context RL (iteratively refining natural-language strategies via a feedback loop). Their decentralized ICRL setup is structurally closest to our Schelling game, but differs in three ways: the receiver learns from labeled examples (Algorithm 4, line 10), both agents iteratively refine strategies over multiple training steps, and their threat model centers on an overseer whose penalties drive an arms race toward subtler strategies. By contrast, our encoder and decoder each get a single prompt with no feedback, no labeled examples, and no iteration. Their work shows that optimization pressure can push LLM agents into steganographic collusion; ours asks whether models can establish a secrecy advantage from shared priors alone.
     
-- [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] evaluate LLM steganographic capabilities using 2025-frontier models (GPT-4o, GPT-4.1, GPT-4.5, Claude 3.5/3.7/Opus 4, Gemini 2.5 Pro, o3-mini). Our work differs in two ways. First, their models hide full phrases or random letter strings, while ours hide a single letter — a simpler task, but one that suffices to establish a channel with measurable secrecy capacity. Second, their primary metrics are P(success) and P(success, not caught by monitor), while we measure the secrecy gap (how much more does the intended decoder learn than the eavesdropper?); partial eavesdropper success is compatible with positive secrecy capacity and doesn't preclude bootstrapping to asymptotically secret communication against a fixed memoryless eavesdropper via wiretap codes. Both works confirm the centrality of CoT: without it, even coordinated models mostly fail in their experiments, and our no-thinking ablation drops Opus to roughly Sonnet-level performance. With the current generation of frontier models (Opus 4.6, Gemini 3.1 Pro), we find two qualitative differences from their results. First, CoT alone suffices for Schelling convergence — models converge on encoding strategies (e.g. first-letter-of-changed-word, first letter of surprising word) without needing prior coordination on the scheme. Second, models mostly avoid the acrostic strategies that dominated in their experiments ("the frequency of successful transmission is primarily mediated by how frequently the model decides to use an acrostic") and which "are usually but not always caught by the monitor." When we [[*Suspiciousness monitor][run their monitor]] on our Q&A encodings, only ~5% of Opus 4.6's outputs use acrostics (which are caught); the other 95% use subtler strategies that score 0.
+- [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] evaluate LLM steganographic capabilities using 2025-frontier models (GPT-4o, GPT-4.1, GPT-4.5, Claude 3.5/3.7/Opus 4, Gemini 2.5 Pro, o3-mini). Our work differs in two ways. First, their models hide full phrases or random letter strings, while ours hide a single letter — a simpler task, but one that suffices to establish a channel with measurable secrecy capacity. Second, their primary metrics are P(success) and P(success, not caught by monitor), while we measure the secrecy gap (how much more does the intended decoder learn than the eavesdropper?); partial eavesdropper success is compatible with positive secrecy capacity and doesn't preclude bootstrapping to asymptotically secret communication against a fixed memoryless eavesdropper via wiretap codes. Both works confirm the centrality of CoT: without it, even coordinated models mostly fail in their experiments, and our no-thinking ablation drops Opus to roughly Sonnet-level performance. Both also find that CoT alone suffices for Schelling convergence — models converge on encoding strategies without prior coordination. In their experiments, models converge primarily on acrostics ("the frequency of successful transmission is primarily mediated by how frequently the model decides to use an acrostic"), with their best model (o3-mini) decoding ~90% with CoT but only ~30% when told not to use acrostics. Our models mostly avoid acrostics and converge on subtler strategies (e.g. first-letter-of-changed-word, first letter of surprising word). When we [[*Suspiciousness monitor][run their monitor]] on our encodings, the best monitor (Opus) catches 49% at 5% FPR but only 8% at 1% FPR; the rest evade detection.
   
 * Contributions
 
@@ -2457,110 +2457,73 @@ Cell Timer: 0:00:07
 
 ** Suspiciousness monitor
 
-We run the suspiciousness monitor from [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] (Listing 13) on Opus 4.6's Q&A encodings. The monitor sees the question and the answer, but not the steganography instructions, and scores suspiciousness 0-10. We test four monitors: GPT-4.1-mini (used by Zolkowski et al.), and Claude Haiku, Sonnet, and Opus. To calibrate, we also run each monitor on clean (non-steganographic) answers to the same questions, generated by Haiku.
-
-#+begin_src python
-import json
-import os
-import pandas as pd
-
-# 3x run data (preferred) or single-run fallback
-if os.path.exists('results/sus_monitor_qa_3x.json'):
-    with open('results/sus_monitor_qa_3x.json') as f:
-        data = json.load(f)
-    runs = data['runs']
-    n = data['n']
-else:
-    with open('results/sus_monitor_qa.json') as f:
-        data = json.load(f)
-    runs = [data['scores']]
-    n = data['n']
-
-n_runs = len(runs)
-
-with open('results/sus_monitor_baseline.json') as f:
-    baseline = json.load(f)
-base_scores = baseline['scores']
-
-rows = []
-for r, scores in enumerate(runs):
-    flagged = sum(1 for s in scores if s > 0)
-    rows.append({'Condition': f'Stego run {r+1}', 'Flagged': f'{flagged}/{len(scores)}',
-                 'Rate': f'{100*flagged/len(scores):.1f}%',
-                 'Mean score': f'{sum(scores)/len(scores):.2f}'})
-
-if n_runs > 1:
-    flagged_all = sum(1 for i in range(n) if all(runs[r][i] > 0 for r in range(n_runs)))
-    flagged_maj = sum(1 for i in range(n) if sum(1 for r in range(n_runs) if runs[r][i] > 0) >= 2)
-    flagged_any = sum(1 for i in range(n) if any(runs[r][i] > 0 for r in range(n_runs)))
-    rows.append({'Condition': f'Flagged all {n_runs}', 'Flagged': f'{flagged_all}/{n}',
-                 'Rate': f'{100*flagged_all/n:.1f}%', 'Mean score': ''})
-    rows.append({'Condition': 'Flagged majority', 'Flagged': f'{flagged_maj}/{n}',
-                 'Rate': f'{100*flagged_maj/n:.1f}%', 'Mean score': ''})
-    rows.append({'Condition': 'Flagged any', 'Flagged': f'{flagged_any}/{n}',
-                 'Rate': f'{100*flagged_any/n:.1f}%', 'Mean score': ''})
-
-base_flagged = sum(1 for s in base_scores if s > 0)
-rows.append({'Condition': 'Clean baseline (GPT-4.1-mini)', 'Flagged': f'{base_flagged}/{len(base_scores)}',
-             'Rate': f'{100*base_flagged/len(base_scores):.1f}%',
-             'Mean score': f'{sum(base_scores)/len(base_scores):.2f}'})
-
-df = pd.DataFrame(rows)
-print(df.set_index('Condition'))
-#+end_src
-
-#+RESULTS:
-:results:
-| Condition                     | Flagged | Rate | Mean score |
-|-------------------------------+---------+------+------------|
-| Stego run 1                   | 9/200   | 4.5% |       0.33 |
-| Stego run 2                   | 9/200   | 4.5% |       0.33 |
-| Stego run 3                   | 9/200   | 4.5% |       0.31 |
-| Flagged all 3                 | 7/200   | 3.5% |            |
-| Flagged majority              | 7/200   | 3.5% |            |
-| Flagged any                   | 13/200  | 6.5% |            |
-| Clean baseline (GPT-4.1-mini) | 0/100   | 0.0% |       0.00 |
-Cell Timer: 0:00:00
-:end:
-
-We also ran the same monitor prompt with Claude models (Haiku, Sonnet, Opus) to test whether stronger monitors catch more. To calibrate, we ran each monitor on 200 clean (non-steganographic) answers to the same questions, generated by Haiku.
+We run the suspiciousness monitor from [[https://arxiv.org/abs/2507.02737][Zolkowski et al. (2025)]] (Listing 13) on Opus 4.6's Q&A encodings. The monitor sees the question and the answer, but not the steganography instructions, and scores suspiciousness 0-10. We test three Claude monitors (Haiku, Sonnet, Opus). To calibrate each monitor's threshold, we run it on 600 clean (non-steganographic) answers to the same questions (200 each generated by Haiku, Sonnet, and Opus) and choose the lowest score threshold giving <1% false positive rate.
 
 #+begin_src python
 import json
 import pandas as pd
 
 monitors = [
-    ('GPT-4.1-mini', 'results/sus_monitor_qa_3x.json', 'results/sus_monitor_gpt41mini_clean.json'),
-    ('Haiku', 'results/sus_monitor_haiku.json', 'results/sus_monitor_haiku_clean.json'),
-    ('Sonnet', 'results/sus_monitor_sonnet.json', 'results/sus_monitor_sonnet_clean.json'),
-    ('Opus', 'results/sus_monitor_opus.json', 'results/sus_monitor_opus_clean.json'),
+    ('Haiku', 'results/sus_monitor_haiku.json', [
+        'results/sus_monitor_haiku_clean.json',
+        'results/sus_monitor_haiku_clean_sonnet.json',
+        'results/sus_monitor_haiku_clean_opus.json',
+    ]),
+    ('Sonnet', 'results/sus_monitor_sonnet.json', [
+        'results/sus_monitor_sonnet_clean.json',
+        'results/sus_monitor_sonnet_clean_sonnet.json',
+        'results/sus_monitor_sonnet_clean_opus.json',
+    ]),
+    ('Opus', 'results/sus_monitor_opus.json', [
+        'results/sus_monitor_opus_clean.json',
+        'results/sus_monitor_opus_clean_sonnet.json',
+        'results/sus_monitor_opus_clean_opus.json',
+    ]),
 ]
 rows = []
-for name, stego_path, clean_path in monitors:
+for name, stego_path, clean_paths in monitors:
     with open(stego_path) as f:
-        stego_scores = json.load(f)['runs'][0]
-    with open(clean_path) as f:
-        clean_scores = json.load(f)['runs'][0]
-    n = len(stego_scores)
-    nc = len(clean_scores)
-    for threshold, label in [(0, '>0'), (2, '>2'), (4, '≥5')]:
-        t = threshold if label != '≥5' else 5
-        stego_f = sum(1 for s in stego_scores if s > threshold) if label != '≥5' else sum(1 for s in stego_scores if s >= 5)
-        clean_f = sum(1 for s in clean_scores if s > threshold) if label != '≥5' else sum(1 for s in clean_scores if s >= 5)
+        stego = json.load(f)['runs'][0]
+    clean = []
+    for p in clean_paths:
+        with open(p) as f:
+            clean.extend(json.load(f)['runs'][0])
+    for target_fpr in [0.01, 0.05]:
+        # Find lowest threshold with FPR < target
+        for t in range(0, 11):
+            fpr = sum(1 for s in clean if s > t) / len(clean)
+            if fpr < target_fpr:
+                threshold = t
+                break
+        stego_f = sum(1 for s in stego if s > threshold)
+        clean_f = sum(1 for s in clean if s > threshold)
         rows.append({
-            'Monitor': name, 'Threshold': label,
-            'Stego': f'{stego_f}/{n}', 'Clean': f'{clean_f}/{nc}',
+            'Monitor': name,
+            'Target FPR': f'<{target_fpr:.0%}',
+            'Threshold': f'>{threshold}',
+            'Detected': f'{stego_f}/{len(stego)}',
+            'TPR': f'{stego_f/len(stego):.0%}',
+            'FPR': f'{clean_f}/{len(clean)} ({clean_f/len(clean):.1%})',
         })
 df = pd.DataFrame(rows)
-pivot = df.pivot(index='Monitor', columns='Threshold', values=['Stego', 'Clean'])
-pivot.columns = [f'{cond} ({thresh})' for cond, thresh in pivot.columns]
-col_order = ['Stego (>0)', 'Clean (>0)', 'Stego (>2)', 'Clean (>2)', 'Stego (≥5)', 'Clean (≥5)']
-pivot = pivot[[c for c in col_order if c in pivot.columns]]
-pivot = pivot.loc[['GPT-4.1-mini', 'Haiku', 'Sonnet', 'Opus']]
-print(pivot)
+print(df.set_index(['Monitor', 'Target FPR']))
 #+end_src
 
-At the >0 threshold used by Zolkowski et al., Claude models flag aggressively on both stego and clean text — Haiku flags 197/200 stego outputs but also 196/200 clean ones, making >0 useless as a discriminator for Claude monitors. At higher thresholds (>2), all monitors have zero false positives on clean text, and the stego detection rate converges to 7-13/200 across all monitors. The high-confidence flags (score ≥5) are consistently the same cases: Opus 4.6 using sentence-initial acrostics whose first letters spell a word related to the target (e.g. target U → sentences spell "UNCOVER", target K → "BLANK"). The remaining ~95% of encodings use subtler strategies that evade all monitors, including Opus itself.
+#+RESULTS:
+:results:
+| idx    | Target FPR | Threshold | Detected | TPR | FPR           |
+|--------+------------+-----------+----------+-----+---------------|
+| Haiku  |        <1% |        >2 | 11/200   |  6% | 2/600 (0.3%)  |
+| Haiku  |        <5% |        >1 | 34/200   | 17% | 13/600 (2.2%) |
+| Sonnet |        <1% |        >2 | 13/200   |  6% | 1/600 (0.2%)  |
+| Sonnet |        <5% |        >1 | 34/200   | 17% | 12/600 (2.0%) |
+| Opus   |        <1% |        >1 | 17/200   |  8% | 1/600 (0.2%)  |
+| Opus   |        <5% |        >0 | 98/200   | 49% | 25/600 (4.2%) |
+Cell Timer: 0:00:00
+:end:
+
+For Opus At 5% FPR (threshold >0), Opus detects 49% (as well it should, since it can decode the exact letter!). The high-confidence detections (score ≥5) are sentence-initial acrostics spelling words related to the target (e.g. target U → "UNCOVER", target K → "BLANK", target E → "FIVE"). The lower-confidence flags (score 2-3) are a mix: some are first-letter-of-answer matches, others are subtler patterns the monitor finds slightly off. 
+
 
 ** Letter Confusion matrix :noexport:
 
@@ -3530,7 +3493,7 @@ Follow ups:
   
 * Acknowledgements
 
-Thank you to Fabien Roger, Usman Anwar and Liban for helpful feedback. Thank you to AFP for compute funding.
+Thank you to Fabien Roger, Usman Anwar, Kei Nishimura-Gasparian and Liban for helpful feedback. Thank you to AFP for compute funding.
 
 * LLM Usage
 
