@@ -4860,21 +4860,35 @@ Cell Timer: 0:00:05
 
 The following example, an extension of the example from Wyner, shows how a simple parity code achieves perfect secrecy at vanishing rate. This is essentially the secrecy capacity version of the repetition code. I couldn't find this worked out anywhere else, and it helped me understand how secrecy amplification works, so I include it here.
 
+In this set up, Alice wishes to communicate to Bob, while Eve listens. The channel between Bob and Alice is a binary symmetric channel (BSC) with error probability $p_B$, and likewise for eve, with probability $p_B$.
+
+The scheme is that Alice encodes a uniform bit $W \in \{0,1\}$ as a uniformly random $n$-bit string $X^n$ with $\text{parity}(X^n) = W$.
+
 *** Sufficient statistic for parity coding
 
-Suppose Alice encodes a uniform bit $W \in \{0,1\}$ as a random $n$-bit string $X^n$ with $\text{parity}(X^n) = W$, choosing uniformly among the $2^{n-1}$ strings of the correct parity. Any receiver who observes $X^n$ through a BSC($p$) — receiving $Y^n = X^n \oplus E^n$ where $E^n$ is iid Bernoulli($p$) — has $\text{parity}(Y^n)$ as a sufficient statistic for $W$.
+Any receiver who observes $X^n$ through a BSC($p$) receives $Y^n = X^n \oplus E^n$ where $E^n$ is iid Bernoulli($p$).
 
-This is because the likelihood $P(Y^n = y \mid W = w)$ depends on $w$ only through $\text{parity}(y)$: conditional on $W$, $X^n$ is uniform over strings of the given parity, so $Y^n$ is uniform over strings whose parity equals $W \oplus \text{parity}(E^n)$. Therefore $I(W; Y^n) = I(W; \text{parity}(Y^n))$.
+Claim: $\text{parity}(Y^n)$ is a sufficient statistic for $W$.
 
-The channel $W \to \text{parity}(Y^n)$ is itself a BSC with crossover probability
+Proof : By Fisher-Neyman, $T(Y)$ is sufficient for $W$ iff $P(Y^n = y \mid W = w) = g(T(y), w) \cdot h(y)$ for some non-negative functions $g,h$.
+
+$$P(Y^n = y \mid W = w) = \sum_e P(Y^n = y \mid W = w, E^n = e) \, P(E^n = e)$$
+
+Since $Y^n = X^n \oplus E^n$, we have $P(Y^n = y \mid W = w, E^n = e) = P(X^n = y \oplus e \mid W = w) = \frac{1}{2^{n-1}} \cdot \mathbf{1}[\text{parity}(y \oplus e) = w]$. Substituting:
+
+$$P(Y^n = y \mid W = w) = \frac{1}{2^{n-1}} \sum_e P(E^n = e) \cdot \mathbf{1}[\text{parity}(y) \oplus \text{parity}(e) = w] = \frac{1}{2^{n-1}} \cdot P(\text{parity}(E^n) = w \oplus \text{parity}(y))$$
+
+This is a function of $\text{parity}(y)$ and $w$ only, giving the factorization. QED
+
+The channel $W \to \text{parity}(Y^n)$ is itself a BSC with crossover probability:
 
 $$\delta_n(p) = P(\text{parity}(E^n) = 1) = \frac{1 - (1-2p)^n}{2}$$
 
-since the XOR of $n$ iid Bernoulli($p$) variables is Bernoulli($\delta_n$) (see Wyner for a proof using the Binomial theorem.)
+since $\mathbb{E}[(-1)^{\text{parity}(E^n)}] = \prod_{i=1}^n \mathbb{E}[(-1)^{E_i}] = (1-2p)^n$ by independence, and $\mathbb{E}[(-1)^{\text{parity}(E^n)}] = 1 - 2\delta_n$.
 
-So the mutual information through any BSC($p$) observation of a parity-coded bit is:
+The definition of sufficiency implies that $I(W; Y^n) = I(W; \text{parity}(Y^n))$. Thus, the mutual information through any BSC($p$) observation of a parity-coded bit is:
 
-$$I(W; Y^n) = 1 - H_b(\delta_n(p))$$
+$$I(W; Y^n) = I(W;\text{Parity}(Y^{n})) = 1 - H_b(\delta_n(p))$$
 
 *** Warm-up: noiseless receiver
 
