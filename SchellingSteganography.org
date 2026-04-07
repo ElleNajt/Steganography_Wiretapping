@@ -541,7 +541,7 @@ secrecy_gap_plot(db, "alphabet_subtle2", "wikipedia",
 Cell Timer: 0:00:04
 :end:
 
-We provide evidence that reasoning LLMs can execute the primitives for arbitrarily good secrecy against a fixed memoryless steganography monitor. First, thinking models can establish Schelling channels with positive secrecy capacity (as shown above). Second, given a source of randomness, thinking models can [[*Could models boost secrecy with simple wiretap codes?][execute simple wiretap codes]] over these channels, which provide asymptotically secret communication against a fixed memoryless eavesdropper at the cost of vanishing transmission rate. The main obstacle is that [[*Repetition/Parity codes with secrecy but zero asymptotic transmission rate][wiretap coding]] requires a source of randomness, and models are [[*Could models boost secrecy with simple wiretap codes?][not great at that]]; however, an agent would have many opportunities to gather entropy, e.g. reading the hashes of its tool call identifiers. We also argue that a memory eavesdropper is a reasonable assumption in [[*Situations where the abstraction seems accurate][some deployment models]].
+We provide evidence that reasoning LLMs can execute the primitives necessary to achieve arbitrarily good secrecy against a fixed memoryless steganography monitor, which we argue that a memory eavesdropper is a reasonable assumption in [[*Situations where the abstraction seems accurate][some deployment models]]. First, as shown above, thinking models can establish Schelling channels with positive secrecy capacity. Second, given a source of randomness, thinking models can [[*Could models boost secrecy with simple wiretap codes?][execute simple wiretap codes]] over these channels, which provide asymptotically secret communication against a fixed memoryless eavesdropper at the cost of vanishing transmission rate. The main obstacle is that [[*Repetition/Parity codes with secrecy but zero asymptotic transmission rate][wiretap coding]] requires a source of randomness, and models are [[*Could models boost secrecy with simple wiretap codes?][not great at that]]; however, an agent would have many opportunities to gather entropy, e.g. reading the hashes of its tool call identifiers. 
 
 #+begin_src python
 import json, glob
@@ -640,7 +640,7 @@ Finally, since thinking appears to be necessary for this task for the current ge
 
 * Authors note:
 
-I have made an effort to appropriately caveat the conditions under which you can boost secrecy capacity into better steganography. The monitor needs to be memoryless, the guarantees are only asymptotic, and either agents need to run tool calls to create wiretap codes (monitorable), or they need to do it in their CoT (also monitorable) or in a forward pass (which current models cannot do). Additionally, executing the codes requires a source of entropy. Additionally, I do not show an end-to-end execution of boosting Steganography via codes, I just show that relevant primitives can be executed by reasoning models.
+I have made an effort to appropriately caveat the conditions under which you can boost secrecy capacity into better steganography. The monitor needs to be memoryless, the guarantees are only asymptotic, and either agents need to run tool calls to create wiretap codes (monitorable), or they need to do it in their CoT (also monitorable) or in a forward pass (which current models cannot do). Additionally, executing the codes requires a source of entropy. I do not show an end-to-end execution of boosting Steganography via codes, I just show that relevant primitives can be executed by reasoning models.
 
 * Related work 
 
@@ -3010,6 +3010,21 @@ There is a natural but toy deployment scenario where memorylessness holds: two u
 
 This is actually not such an unrealistic example: for instance, the channel could be commit messages in contributions to a codebase, and the PR monitor might be structured to read the commit message, and explore the codebase but not earlier git history, making it effectively memoryless, while a long-running coding agent might read through larger chunks of the commit history, giving it the opportunity to boost its secrecy advantage via wiretap codes.
 
+Why would wiretap codes even be necessary? If the monitor is memoryless, it having a hunch of seeing a letter wouldn't stop models from spelling out words letter by letter directly. 
+
+One reason is that the structure of a monitoring system might be like this:
+
+1) A stego agent monitors each commit message, and *maybe* says -- the model might have been sending the letter 'a.' 
+2) A secondary monitoring system looks at the history of stego. Without wiretap coding, that monitor could probably decode even a partial plaintext.
+
+There are two (additive) ways that schemers could get around that:
+
+1) Making their stream of characters encoded in a way that their counter part can decode. E.g. they could do key exchange over a channel, and then they could try to decode. Noise might impact that a lot, but if they can do general channel coding, they can recover. This requires them to be able to execute public key cryptographic primitives. 
+
+2) They can use wiretap coding so that the message received by the secondary monitoring system looks like noise, because of the weaker decoding of the memoryless stego monitor. This requires them to be able to execute wiretap code primitives, e.g. parity counts.
+
+The mathematical primitives for simple (non-capacity achieving) wiretap codes are easier than for secure public key cryptography, so wiretap codes could be an attractive option for a schemer.  
+  
 *** Situations where the abstraction is lossy
 
 Other real deployments could violate the memoryless assumption. For example, a trusted steganography monitor watching an untrusted model's full conversation transcript would see all messages at once, violating the memoryless assumption. On the other hand, it does seem reasonable to me that seeing all sentences at once would not especially help the weaker monitor; we [[*Stateful eavesdropper (batch decode)][tested this directly]], and saw that seeing a batch of independent encodings generally hurt decoding performance.
