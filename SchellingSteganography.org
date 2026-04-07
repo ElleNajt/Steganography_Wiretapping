@@ -4898,7 +4898,7 @@ The rate is $R = 1/n \to 0$: perfect secrecy at vanishing rate.
 
 *** Noisy receiver with channel advantage
 
-Now suppose both channels are noisy: Bob observes through BSC($p_B$), Eve through BSC($p_E$), with $0 < p_B < p_E < 1/2$. Alice uses the same parity encoding, but now repeats it: she sends $m$ independent $n$-bit blocks, each encoding the same bit $W$ with fresh randomness. The total transmission uses $nm$ channel calls to send 1 bit, so $R = 1/(nm)$.
+Now suppose both channels are noisy: Bob observes through BSC($p_B$), Eve through BSC($p_E$), with $0 < p_B < p_E < 1/2$. Alice uses the same parity encoding, but now repeats it: she sends $m$ independent $n$-bit blocks $X_1^n, \ldots, X_m^n$, each encoding the same bit $W$ with fresh randomness. Bob receives $Y_i^n = X_i^n \oplus E_i^n$ through BSC($p_B$), and Eve receives $Z_i^n = X_i^n \oplus F_i^n$ through BSC($p_E$). Let $U_i = \text{parity}(Y_i^n)$ and $V_i = \text{parity}(Z_i^n)$ be Bob's and Eve's parity bits. The total transmission uses $nm$ channel calls to send 1 bit, so $R = 1/(nm)$.
 
 By the sufficient statistic, each block collapses to a single biased coin flip for each observer:
 
@@ -4907,7 +4907,7 @@ By the sufficient statistic, each block collapses to a single biased coin flip f
 
 **** Bob's decoding
 
-Bob majority-votes over his $m$ parity bits. His probability of correct decode is:
+Bob majority-votes over his $m$ parity bits $U_1, \ldots, U_m$. His probability of correct decode is:
 
 $$P_B(m) = P\left(\text{Bin}(m, 1 - \delta_n(p_B)) > m/2\right)$$
 
@@ -4925,7 +4925,7 @@ $$I(W; V^m) = H(V^m) - H(V^m \mid W) \leq \sum H(V_i) - H(V^m \mid W) = m \cdot 
 
 The first inequality is entropy subadditivity. The second step uses that given $W$, the $V_i$ are iid, so $H(V^m|W) = \sum H(V_i|W)$.
 
-From the sufficient statistic, $I(W; V_1) = 1 - H_b(\delta_n(p_E))$. Next, by using $1 - H_b(1/2 - \epsilon) \approx \frac{2\epsilon^2}{\ln 2}$ for small bias $\epsilon = (1-2p_E)^n/2$:
+From the sufficient statistic section, $I(W; V_1) = 1 - H_b(\delta_n(p_E))$. Taylor expanding $H_b$ around $1/2$: $1 - H_b(1/2 - \epsilon) \approx \frac{2\epsilon^2}{\ln 2}$ with $\epsilon = (1-2p_E)^n/2$:
 
 $$I(W; V^m) \leq m \cdot I(W; V_1) \approx \frac{m}{2\ln 2} (1-2p_E)^{2n}$$
 
